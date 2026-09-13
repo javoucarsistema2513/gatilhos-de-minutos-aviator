@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import {
   Bell,
   Volume2,
-  VolumeX,
   Smartphone,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
   Zap,
+  Radio,
+  Sparkles,
 } from 'lucide-react';
 import { notificationService, NotificationStatus } from '../utils/notifications';
-import { soundEffects } from '../utils/audio';
+import { soundEffects, isStandaloneApp, VoiceEngineType } from '../utils/audio';
 
 interface VoiceNotificationBannerProps {
   onUnlockAudio: () => void;
@@ -20,27 +20,35 @@ export const VoiceNotificationBanner: React.FC<VoiceNotificationBannerProps> = (
   onUnlockAudio,
 }) => {
   const [notifStatus, setNotifStatus] = useState<NotificationStatus>('default');
-  const [isVoiceActive, setIsVoiceActive] = useState<boolean>(soundEffects.voiceEnabled);
+  const [isInstalledApp, setIsInstalledApp] = useState<boolean>(false);
+  const [voiceEngine, setVoiceEngine] = useState<VoiceEngineType>(soundEffects.voiceEngine);
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(soundEffects.isUnlocked);
   const [isTesting, setIsTesting] = useState<boolean>(false);
-  const [showDismiss, setShowDismiss] = useState<boolean>(false);
 
   useEffect(() => {
     setNotifStatus(notificationService.getStatus());
+    setIsInstalledApp(isStandaloneApp());
+    setVoiceEngine(soundEffects.voiceEngine);
+    setIsAudioUnlocked(soundEffects.isUnlocked);
   }, []);
+
+  const handleUnlockAndTest = () => {
+    setIsAudioUnlocked(true);
+    onUnlockAudio();
+  };
 
   const handleRequestNotif = async () => {
     const status = await notificationService.requestPermission();
     setNotifStatus(status);
-    // Também desbloqueia a voz no mesmo clique do usuário
-    onUnlockAudio();
+    handleUnlockAndTest();
   };
 
   const handleTestVoiceAndAudio = () => {
     setIsTesting(true);
-    onUnlockAudio();
+    handleUnlockAndTest();
     soundEffects.playPrepareWarning();
-    soundEffects.speakVoice('Atenção: Teste de voz do Betão! Entrada confirmada no minuto alvo.');
-    setTimeout(() => setIsTesting(false), 2000);
+    soundEffects.speakVoice('Atenção: Teste de voz do Betão no aplicativo instalado! Entrada confirmada no minuto alvo.');
+    setTimeout(() => setIsTesting(false), 2200);
   };
 
   const handleTestBackgroundNotif = () => {
@@ -51,6 +59,17 @@ export const VoiceNotificationBanner: React.FC<VoiceNotificationBannerProps> = (
       requireInteraction: true,
       renotify: true,
     });
+  };
+
+  const handleChangeEngine = (newEngine: VoiceEngineType) => {
+    soundEffects.setVoiceEngine(newEngine);
+    setVoiceEngine(newEngine);
+    handleUnlockAndTest();
+    if (newEngine === 'pwa_audio') {
+      soundEffects.speakVoice('Modo de Áudio HD do aplicativo ativado!');
+    } else {
+      soundEffects.speakVoice('Modo de Voz Nativa do sistema ativado!');
+    }
   };
 
   const isGranted = notifStatus === 'granted';
@@ -84,10 +103,17 @@ export const VoiceNotificationBanner: React.FC<VoiceNotificationBannerProps> = (
                 Alertas em Segundo Plano & Voz Ativa
               </span>
 
+              {isInstalledApp ? (
+                <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1">
+                  <Smartphone className="w-3 h-3 text-purple-400" />
+                  APP INSTALADO (PWA)
+                </span>
+              ) : null}
+
               {isGranted ? (
                 <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
-                  SEGUNDO PLANO ATIVADO
+                  2º PLANO ATIVADO
                 </span>
               ) : (
                 <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse flex items-center gap-1">
@@ -98,8 +124,41 @@ export const VoiceNotificationBanner: React.FC<VoiceNotificationBannerProps> = (
             </div>
 
             <p className="text-[11px] text-slate-300 mt-1 leading-snug">
-              Receba os alertas sonoros, fala por voz e notificações na tela do celular/PC mesmo enquanto estiver na aba do Betão!
+              {isInstalledApp
+                ? 'Otimizado para o Aplicativo Instalado: utiliza motor de Áudio HD com compatibilidade total para celular.'
+                : 'Receba os alertas sonoros, fala por voz e notificações na tela mesmo enquanto estiver na aba do Betão!'}
             </p>
+
+            {/* Seletor de Motor de Voz */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="text-[10px] font-bold text-slate-400">Motor de Fala:</span>
+              <button
+                type="button"
+                onClick={() => handleChangeEngine('pwa_audio')}
+                className={`px-2 py-0.5 text-[10px] rounded-lg font-bold transition flex items-center gap-1 ${
+                  voiceEngine === 'pwa_audio' || (voiceEngine === 'auto' && isInstalledApp)
+                    ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50 shadow-xs'
+                    : 'bg-slate-800/60 text-slate-400 border border-slate-700 hover:text-slate-300'
+                }`}
+                title="Áudio HD PWA: ideal para aplicativo instalado no Android e iPhone"
+              >
+                <Radio className="w-2.5 h-2.5 text-rose-400" />
+                <span>Áudio HD PWA (Recomendado)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleChangeEngine('native')}
+                className={`px-2 py-0.5 text-[10px] rounded-lg font-bold transition flex items-center gap-1 ${
+                  voiceEngine === 'native'
+                    ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50 shadow-xs'
+                    : 'bg-slate-800/60 text-slate-400 border border-slate-700 hover:text-slate-300'
+                }`}
+                title="Voz nativa do sistema operacional"
+              >
+                <span>Voz do Sistema</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -127,18 +186,19 @@ export const VoiceNotificationBanner: React.FC<VoiceNotificationBannerProps> = (
             </button>
           )}
 
-          {/* Botão Testar / Desbloquear Voz */}
+          {/* Botão Testar / Desbloquear Voz no App */}
           <button
             id="test-voice-btn"
             onClick={handleTestVoiceAndAudio}
             disabled={isTesting}
-            className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-rose-950/40 transition flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black text-xs shadow-md shadow-rose-950/40 transition flex items-center gap-1.5"
           >
-            <Volume2 className={`w-3.5 h-3.5 ${isTesting ? 'animate-bounce' : ''}`} />
-            <span>{isTesting ? 'Falando...' : '🔊 Testar Voz do Betão'}</span>
+            <Volume2 className={`w-4 h-4 ${isTesting ? 'animate-bounce text-amber-300' : ''}`} />
+            <span>{isTesting ? 'Falando no App...' : '🔊 Testar Voz no App'}</span>
           </button>
         </div>
       </div>
     </div>
   );
 };
+

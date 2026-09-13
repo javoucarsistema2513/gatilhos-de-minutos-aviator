@@ -3,7 +3,6 @@ import confetti from 'canvas-confetti';
 import { Header } from './components/Header';
 import { RoundsHistoryBar } from './components/RoundsHistoryBar';
 import { ActiveSignalCard } from './components/ActiveSignalCard';
-import { LiveFlightRadar } from './components/LiveFlightRadar';
 import { MinuteHeatmap } from './components/MinuteHeatmap';
 import { SignalsHistory } from './components/SignalsHistory';
 import { BankrollCalculator } from './components/BankrollCalculator';
@@ -16,6 +15,8 @@ import { VoiceNotificationBanner } from './components/VoiceNotificationBanner';
 import { RoundData, TriggerSignal, ConfidenceMode } from './types';
 import {
   generateInitialRounds,
+  generateRealisticMultiplier,
+  getMultiplierTier,
   analyzeTriggers,
   calculateMinuteHeatmap,
   calculateGlobalStats,
@@ -119,6 +120,27 @@ export default function App() {
       ticker.stop();
     };
   }, [activeSignal]);
+
+  // Atualização suave de rodadas em segundo plano simulando o fluxo da mesa do Betão
+  useEffect(() => {
+    if (!isAutoFeed) return;
+
+    const interval = window.setInterval(() => {
+      const multiplier = generateRealisticMultiplier();
+      const now = new Date();
+      const newRound: RoundData = {
+        id: `auto-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        multiplier,
+        timestamp: now.getTime(),
+        timeFormatted: formatTime(now),
+        minute: now.getMinutes(),
+        tier: getMultiplierTier(multiplier),
+      };
+      setRounds((prev) => [...prev.slice(-99), newRound]);
+    }, 14000);
+
+    return () => clearInterval(interval);
+  }, [isAutoFeed]);
 
   // Recalcular gatilhos com base no modo selecionado e rodadas
   useEffect(() => {
@@ -278,7 +300,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-orange-400 animate-ping" />
             <span className="text-slate-300">
-              Radar conectado aos minutos <strong className="text-orange-400 font-extrabold">do Betão</strong>. <strong className="text-white">Minuto Atual: :{String(currentMinute).padStart(2, '0')}</strong>
+              Gatilhos conectados aos minutos <strong className="text-orange-400 font-extrabold">do Betão</strong>. <strong className="text-white">Minuto Atual: :{String(currentMinute).padStart(2, '0')}</strong>
             </span>
           </div>
 
@@ -294,26 +316,14 @@ export default function App() {
           </div>
         </div>
 
-        {/* Top Operational Section: Active Signal + Live Flight Simulator */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Active Signal Card (Principal) */}
-          <div className="lg:col-span-7">
-            <ActiveSignalCard
-              signal={activeSignal}
-              currentMinute={currentMinute}
-              currentSecond={currentSecond}
-              onConfirmGreen={handleConfirmGreen}
-            />
-          </div>
-
-          {/* Live Flight Radar Simulator */}
-          <div className="lg:col-span-5">
-            <LiveFlightRadar
-              onNewRound={handleNewRound}
-              isAutoFeed={isAutoFeed}
-              onToggleAutoFeed={() => setIsAutoFeed((prev) => !prev)}
-            />
-          </div>
+        {/* Top Operational Section: Active Signal (Foco Total no Gatilho Ativo) */}
+        <div className="w-full">
+          <ActiveSignalCard
+            signal={activeSignal}
+            currentMinute={currentMinute}
+            currentSecond={currentSecond}
+            onConfirmGreen={handleConfirmGreen}
+          />
         </div>
 
         {/* 60-Minute Heatmap Grid */}
