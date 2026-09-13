@@ -12,6 +12,7 @@ import { StrategyGuideModal } from './components/StrategyGuideModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { BetaoSyncBar } from './components/BetaoSyncBar';
 import { ModeSelector } from './components/ModeSelector';
+import { VoiceNotificationBanner } from './components/VoiceNotificationBanner';
 import { RoundData, TriggerSignal, ConfidenceMode } from './types';
 import {
   generateInitialRounds,
@@ -22,6 +23,8 @@ import {
   formatTime,
 } from './utils/aviatorEngine';
 import { soundEffects } from './utils/audio';
+import { notificationService } from './utils/notifications';
+import { BackgroundTicker } from './utils/workerTicker';
 import { HelpCircle, RefreshCw } from 'lucide-react';
 
 export default function App() {
@@ -40,41 +43,81 @@ export default function App() {
   const hasSpokenPrepareRef = useRef<string | null>(null);
   const hasSpokenEnterRef = useRef<string | null>(null);
 
-  // Relógio Atômico em Tempo Real (segundo a segundo)
+  // Desbloquear motor de áudio e fala no primeiro clique ou toque na tela
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      const now = new Date();
+    const handleUnlock = () => {
+      soundEffects.unlock();
+      window.removeEventListener('click', handleUnlock);
+      window.removeEventListener('touchstart', handleUnlock);
+    };
+    window.addEventListener('click', handleUnlock);
+    window.addEventListener('touchstart', handleUnlock);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        notificationService.resetTabTitle();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('click', handleUnlock);
+      window.removeEventListener('touchstart', handleUnlock);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  // Relógio Atômico em Tempo Real via Web Worker Ticker (imune a congelamento em segundo plano)
+  useEffect(() => {
+    const ticker = new BackgroundTicker();
+
+    ticker.start((timestamp) => {
+      const now = new Date(timestamp);
       setCurrentDate(now);
 
       const sec = now.getSeconds();
       const currentMin = now.getMinutes();
 
-      // Alerta de Preparação no Betão (quando faltam 15 segundos)
+      // Alerta de Preparação no Betão (quando faltam 15 segundos para o minuto alvo)
       if (activeSignal && activeSignal.targetMinute === (currentMin + 1) % 60 && sec === 45) {
-        if (hasSpokenPrepareRef.current !== activeSignal.id) {
-          hasSpokenPrepareRef.current = activeSignal.id;
+        const prepareKey = `${activeSignal.id}-prepare-${activeSignal.targetMinute}`;
+        if (hasSpokenPrepareRef.current !== prepareKey) {
+          hasSpokenPrepareRef.current = prepareKey;
           soundEffects.playPrepareWarning();
-          soundEffects.speakVoice("Atenção: Prepare a entrada no Betão!");
+          soundEffects.speakVoice(
+            `Atenção! Faltam 15 segundos para o minuto ${activeSignal.targetMinuteFormatted} no Betão. Prepare a aposta!`
+          );
+          notificationService.notifyPrepare(activeSignal.targetMinuteFormatted, 15);
         }
       }
 
       // Alerta de Entrada Ativa no Betão (no segundo :00 do minuto alvo)
       if (activeSignal && activeSignal.targetMinute === currentMin && sec === 0) {
-        if (hasSpokenEnterRef.current !== activeSignal.id) {
-          hasSpokenEnterRef.current = activeSignal.id;
+        const enterKey = `${activeSignal.id}-enter-${activeSignal.targetMinute}`;
+        if (hasSpokenEnterRef.current !== enterKey) {
+          hasSpokenEnterRef.current = enterKey;
           soundEffects.playSignalAlert();
-          soundEffects.speakVoice("Entrada confirmada no Betão! Aposte agora.");
+          soundEffects.speakVoice(
+            `Entrada confirmada agora no Betão! Minuto ${activeSignal.targetMinuteFormatted}. Saída de segurança em ${activeSignal.recommendedSafeExit.toFixed(2)}x!`
+          );
+          notificationService.notifyEnter(
+            activeSignal.targetMinuteFormatted,
+            activeSignal.recommendedSafeExit,
+            activeSignal.probability
+          );
         }
       }
 
-      // Tick nos últimos 3 segundos antes da virada do minuto
+      // Tick sonoro nos últimos 3 segundos antes da virada do minuto
       if (sec >= 57 && sec !== prevSecondRef.current) {
         prevSecondRef.current = sec;
         soundEffects.playTick();
       }
-    }, 1000);
+    });
 
-    return () => clearInterval(timer);
+    return () => {
+      ticker.stop();
+    };
   }, [activeSignal]);
 
   // Recalcular gatilhos com base no modo selecionado e rodadas
@@ -82,10 +125,18 @@ export default function App() {
     const signal = analyzeTriggers(rounds, currentDate, confidenceMode);
     setActiveSignal(signal);
 
-    // Se um novo sinal foi detectado e for diferente do anterior, tocar alerta
+    // Se um novo sinal foi detectado e for diferente do anterior, tocar alerta sonoro e falar
     if (signal && signal.id !== prevSignalIdRef.current) {
       prevSignalIdRef.current = signal.id;
       soundEffects.playSignalAlert();
+      soundEffects.speakVoice(
+        `Novo gatilho Sniper Betão detectado: Minuto ${signal.targetMinuteFormatted} com ${signal.probability}% de probabilidade!`
+      );
+      notificationService.sendNotification({
+        title: `🎯 NOVO GATILHO BETÃO: Minuto ${signal.targetMinuteFormatted}`,
+        body: `Alvo projetado: ${signal.recommendedSafeExit.toFixed(2)}x. Probabilidade: ${signal.probability}%.`,
+        tag: 'betao-new-signal',
+      });
 
       // Adicionar à lista de sinais se não existir
       setSignalsHistory((prev) => {
@@ -104,6 +155,10 @@ export default function App() {
       const isGreen = newRound.multiplier >= activeSignal.recommendedSafeExit;
       if (isGreen) {
         soundEffects.playGreenCelebration();
+        soundEffects.speakVoice(
+          `Green confirmado no Betão! Vela ${newRound.multiplier.toFixed(2)}x!`
+        );
+        notificationService.notifyGreen(newRound.multiplier);
         confetti({
           particleCount: 90,
           spread: 75,
@@ -136,6 +191,12 @@ export default function App() {
   // Validar Green manualmente
   const handleConfirmGreen = (signalId: string) => {
     soundEffects.playGreenCelebration();
+    soundEffects.speakVoice('Green validado com sucesso!');
+    notificationService.sendNotification({
+      title: '🎉 GREEN VALIDADO NO BETÃO!',
+      body: 'Gatilho confirmado e computado no seu histórico de acertos.',
+      tag: 'betao-manual-green',
+    });
     confetti({
       particleCount: 110,
       spread: 80,
@@ -195,6 +256,9 @@ export default function App() {
 
       {/* Main Content Dashboard */}
       <main className="mx-auto w-full max-w-7xl px-3 sm:px-6 pt-3 sm:pt-5 space-y-4 sm:space-y-5 flex-1">
+        {/* Banner de Notificações em Segundo Plano & Desbloqueio de Voz */}
+        <VoiceNotificationBanner onUnlockAudio={() => soundEffects.unlock()} />
+
         {/* Barra de Sincronia Instantânea com a Mesa do Betão */}
         <BetaoSyncBar
           climate={tableClimate}

@@ -270,14 +270,33 @@ export const ActiveSignalCard: React.FC<ActiveSignalCardProps> = ({
           <span>{signal.description}</span>
         </p>
 
-        <button
-          id="confirm-green-button"
-          onClick={() => onConfirmGreen(signal.id)}
-          className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-4 py-2.5 text-xs font-black shadow-lg shadow-emerald-700/40 transition"
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Validar Green do Gatilho</span>
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            id="hear-signal-voice-btn"
+            onClick={() => {
+              import('../utils/audio').then(({ soundEffects }) => {
+                soundEffects.unlock();
+                soundEffects.speakVoice(
+                  `Entrada no minuto ${signal.targetMinuteFormatted} no Betão. Saída segura em ${signal.recommendedSafeExit.toFixed(2)}x com 98% de acerto.`
+                );
+              });
+            }}
+            className="flex items-center justify-center gap-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 px-3 py-2.5 text-xs font-bold transition active:scale-95"
+            title="Ouvir instrução por voz"
+          >
+            <Bell className="w-3.5 h-3.5 text-rose-400" />
+            <span>Ouvir Alerta</span>
+          </button>
+
+          <button
+            id="confirm-green-button"
+            onClick={() => onConfirmGreen(signal.id)}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-4 py-2.5 text-xs font-black shadow-lg shadow-emerald-700/40 transition"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Validar Green</span>
+          </button>
+        </div>
       </div>
     </div>
   );

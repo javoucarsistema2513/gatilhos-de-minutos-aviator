@@ -79,19 +79,20 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* Botão de Áudio */}
+          {/* Botão de Áudio e Voz */}
           <button
             id="audio-toggle-button"
             onClick={onToggleAudio}
-            className={`p-2 rounded-xl border transition ${
+            className={`px-2.5 py-1.5 rounded-xl border font-bold text-xs transition flex items-center gap-1.5 ${
               isAudioEnabled
-                ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                ? 'border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 shadow-xs shadow-rose-950'
                 : 'border-slate-800 bg-slate-900 text-slate-500 hover:text-slate-300'
             }`}
-            title={isAudioEnabled ? 'Desativar Sons' : 'Ativar Sons de Alerta'}
-            aria-label="Controle de Áudio"
+            title={isAudioEnabled ? 'Sons e Voz Ativos (Clique para alternar)' : 'Ativar Sons e Voz'}
+            aria-label="Controle de Áudio e Voz"
           >
-            {isAudioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {isAudioEnabled ? <Volume2 className="w-4 h-4 text-rose-400" /> : <VolumeX className="w-4 h-4" />}
+            <span className="hidden sm:inline">{isAudioEnabled ? 'Voz & Som ON' : 'Voz Mudo'}</span>
           </button>
 
           {/* PWA Install Button */}
