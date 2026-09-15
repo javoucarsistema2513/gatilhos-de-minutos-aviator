@@ -21,6 +21,7 @@ export interface RoundData {
   minute: number; // 0 - 59
   timeFormatted: string; // HH:mm:ss
   tier: MultiplierTier;
+  source?: 'BETAO_LIVE' | 'BETAO_SYNC' | 'BETAO_AUTO';
 }
 
 export type TriggerStrategy = 

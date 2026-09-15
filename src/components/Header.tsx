@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, ShieldCheck, Clock, Flame, Radio } from 'lucide-react';
+import { Volume2, VolumeX, ShieldCheck, Clock, Flame, Radio, ExternalLink, Link2 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { soundEffects } from '../utils/audio';
 
@@ -9,6 +9,8 @@ interface HeaderProps {
   onToggleAudio: () => void;
   winRate: number;
   currentStreak: number;
+  onOpenBetaoBridge?: () => void;
+  isLiveConnected?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleAudio,
   winRate,
   currentStreak,
+  onOpenBetaoBridge,
+  isLiveConnected = false,
 }) => {
   return (
     <header
@@ -37,17 +41,36 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-1">
                 GATILHOS <span className="text-rose-500 font-extrabold">AVIATOR</span>
               </h1>
-              <span className="inline-flex items-center gap-1 rounded bg-orange-500/20 border border-orange-500/40 px-1.5 py-0.5 text-[10px] font-black text-orange-400 uppercase tracking-wider shadow-xs shadow-orange-950">
-                NO BETÃO
-              </span>
+              <button
+                onClick={onOpenBetaoBridge}
+                className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider transition ${
+                  isLiveConnected
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/30'
+                    : 'bg-orange-500/20 border-orange-500/40 text-orange-400 hover:bg-orange-500/30'
+                }`}
+                title="Sincronizar com betao.bet.br/games/aviator-spribe"
+              >
+                <Link2 className="w-2.5 h-2.5" />
+                <span>{isLiveConnected ? 'BETÃO CONECTADO' : 'MESA BETÃO'}</span>
+              </button>
               <span className="hidden sm:inline-flex items-center gap-1 rounded bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 text-[10px] font-bold text-rose-400">
                 <Radio className="w-2.5 h-2.5 animate-pulse text-rose-500" />
                 AO VIVO
               </span>
             </div>
-            <p className="hidden md:block text-[11px] text-slate-400">
-              Minutos Pagadores &amp; Probabilidades no Betão
-            </p>
+            <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-400">
+              <span>Mesa Oficial:</span>
+              <a
+                href="https://betao.bet.br/games/aviator-spribe"
+                target="_blank"
+                rel="noreferrer"
+                className="text-rose-400 hover:text-rose-300 underline font-mono flex items-center gap-0.5"
+                title="Abrir mesa betao.bet.br/games/aviator-spribe"
+              >
+                betao.bet.br/games/aviator-spribe
+                <ExternalLink className="w-2.5 h-2.5 inline" />
+              </a>
+            </div>
           </div>
         </div>
 

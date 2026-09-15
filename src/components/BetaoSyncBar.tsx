@@ -8,6 +8,8 @@ import {
   RotateCcw,
   Sparkles,
   Zap,
+  Radio,
+  ExternalLink,
 } from 'lucide-react';
 import { TableClimate, RoundData } from '../types';
 import { getMultiplierTier, formatTime, parseBatchCandles } from '../utils/aviatorEngine';
@@ -17,6 +19,8 @@ interface BetaoSyncBarProps {
   onAddRound: (round: RoundData) => void;
   onBatchAddRounds: (rounds: RoundData[]) => void;
   onSyncClock: () => void;
+  onOpenBetaoBridge?: () => void;
+  isLiveConnected?: boolean;
 }
 
 export const BetaoSyncBar: React.FC<BetaoSyncBarProps> = ({
@@ -24,6 +28,8 @@ export const BetaoSyncBar: React.FC<BetaoSyncBarProps> = ({
   onAddRound,
   onBatchAddRounds,
   onSyncClock,
+  onOpenBetaoBridge,
+  isLiveConnected = false,
 }) => {
   const [isPasteOpen, setIsPasteOpen] = useState(false);
   const [pastedText, setPastedText] = useState('');
@@ -37,6 +43,7 @@ export const BetaoSyncBar: React.FC<BetaoSyncBarProps> = ({
       minute: now.getMinutes(),
       timeFormatted: formatTime(now),
       tier: getMultiplierTier(multiplier),
+      source: 'BETAO_SYNC',
     };
     onAddRound(newRound);
   };
@@ -95,8 +102,25 @@ export const BetaoSyncBar: React.FC<BetaoSyncBarProps> = ({
 
         {/* Botões de Sincronia Instantânea com a Mesa do Betão */}
         <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-start md:justify-end">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
-            Sincronizar Betão:
+          {/* Botão Conexão Ao Vivo com Betão */}
+          {onOpenBetaoBridge && (
+            <button
+              id="open-betao-bridge-btn"
+              onClick={onOpenBetaoBridge}
+              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                isLiveConnected
+                  ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/80 shadow-emerald-950'
+                  : 'bg-rose-950/80 border-rose-500/60 text-rose-300 hover:bg-rose-900/80 shadow-rose-950'
+              }`}
+              title="Abrir extrator automático para seguir rodadas de betao.bet.br/games/aviator-spribe"
+            >
+              <Radio className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
+              <span>{isLiveConnected ? 'Mesa Betão Sincronizada' : 'Conectar Mesa Betão'}</span>
+            </button>
+          )}
+
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mx-0.5 hidden lg:inline">
+            Atalhos:
           </span>
 
           {/* Atalho Azul */}

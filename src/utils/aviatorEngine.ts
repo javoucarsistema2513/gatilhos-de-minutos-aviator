@@ -101,6 +101,7 @@ export function parseBatchCandles(text: string): RoundData[] {
         minute: d.getMinutes(),
         timeFormatted: formatTime(d),
         tier: getMultiplierTier(mult),
+        source: 'BETAO_SYNC',
       });
     }
   });
