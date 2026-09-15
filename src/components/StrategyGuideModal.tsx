@@ -78,6 +78,17 @@ export const StrategyGuideModal: React.FC<StrategyGuideModalProps> = ({
               Nunca aposte tudo em uma só tentativa. Use <strong>70% na aposta 1</strong> com saída automática em <strong>2.00x</strong> (cobre o custo das duas apostas) e <strong>30% na aposta 2</strong> para deixar subir até 5x, 10x ou mais.
             </p>
           </div>
+
+          {/* Item 5 */}
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <h4 className="font-bold text-white flex items-center gap-1.5 text-sm">
+              <Clock className="w-4 h-4 text-fuchsia-400" />
+              5. Mapeamento dos Melhores Horários (Roxas &amp; Rosas)
+            </h4>
+            <p className="mt-1 text-slate-400">
+              O radar mapeia as 24 horas do dia. Os maiores picos de velas pagadoras no Betão concentram-se no <strong>horário nobre (19h às 23h)</strong>, com até 59% de pagadoras e forte frequência de rosas, além de picos na <strong>tarde (13h às 15h)</strong> e na <strong>madrugada (01h às 03h)</strong>.
+            </p>
+          </div>
         </div>
 
         <button

@@ -77,3 +77,53 @@ export interface GlobalStats {
   averageMultiplier: number;
   currentStreak: number;
 }
+
+export type HourlyAnalysisFilter = 'ALL' | 'PINK_ONLY' | 'PURPLE_ONLY';
+
+export interface HourlyPayoutStats {
+  hour: number; // 0 a 23
+  hourLabel: string; // "00h", "01h", ..., "23h"
+  timeRange: string; // "14:00 - 14:59"
+  totalRounds: number;
+  purpleCount: number;
+  pinkCount: number;
+  blueCount: number;
+  payingCount: number; // purpleCount + pinkCount
+  payingRate: number; // % velas >= 2.00x
+  pinkRate: number; // % velas >= 10.00x
+  purpleRate: number; // % velas 2.00x a 9.99x
+  score: number; // 0 a 100
+  intensity: 'PICO_MAXIMO' | 'ALTA' | 'MEDIA' | 'MODERADA';
+  isCurrentHour: boolean;
+  isTopHour: boolean;
+  isTopPinkHour: boolean;
+  goldenMinutes: number[]; // minutos mais pagadores desta hora
+  avgMultiplier: number;
+}
+
+export interface PeriodSummary {
+  key: 'MADRUGADA' | 'MANHA' | 'TARDE' | 'NOITE';
+  label: string;
+  hoursRange: string;
+  payingRate: number;
+  pinkRate: number;
+  status: 'QUENTE' | 'ESTAVEL' | 'RECOLHENDO';
+  description: string;
+  bestHourInPeriod: string;
+}
+
+export interface HourlyPayoutMapResult {
+  hours: HourlyPayoutStats[];
+  topOverallHours: HourlyPayoutStats[];
+  topPinkHours: HourlyPayoutStats[];
+  topPurpleHours: HourlyPayoutStats[];
+  currentHourData: HourlyPayoutStats;
+  nextHotWindow: {
+    timeRange: string;
+    strategyNote: string;
+    expectedPayoutRate: number;
+  };
+  periods: PeriodSummary[];
+  overallGoldenMinutes: { minute: number; pinkCount: number; purpleCount: number; score: number }[];
+}
+

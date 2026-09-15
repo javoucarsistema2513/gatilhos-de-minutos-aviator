@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { RoundsHistoryBar } from './components/RoundsHistoryBar';
 import { ActiveSignalCard } from './components/ActiveSignalCard';
 import { MinuteHeatmap } from './components/MinuteHeatmap';
+import { BestPayoutHoursMap } from './components/BestPayoutHoursMap';
 import { SignalsHistory } from './components/SignalsHistory';
 import { BankrollCalculator } from './components/BankrollCalculator';
 import { ManualEntryModal } from './components/ManualEntryModal';
@@ -20,6 +21,7 @@ import {
   getMultiplierTier,
   analyzeTriggers,
   calculateMinuteHeatmap,
+  calculateHourlyPayoutMap,
   calculateGlobalStats,
   calculateTableClimate,
   formatTime,
@@ -349,6 +351,8 @@ export default function App() {
     activeSignal?.targetMinute
   );
 
+  const hourlyPayoutData = calculateHourlyPayoutMap(rounds, currentDate);
+
   const stats = calculateGlobalStats(rounds, signalsHistory);
 
   return (
@@ -471,6 +475,12 @@ export default function App() {
             onConfirmGreen={handleConfirmGreen}
           />
         </div>
+
+        {/* Mapeamento de Melhores Horários de Pagamento (Roxas e Rosas) */}
+        <BestPayoutHoursMap
+          hourlyData={hourlyPayoutData}
+          currentMinute={currentMinute}
+        />
 
         {/* 60-Minute Heatmap Grid */}
         <MinuteHeatmap
