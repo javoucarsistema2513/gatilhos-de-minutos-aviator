@@ -226,24 +226,39 @@ export function analyzeTriggers(
     };
   }
 
-  // --- REGRA 2: Gatilho Pós-Rosa (M+2 ou M+3) no Betão ---
+  // --- REGRA 2: Projeção Pós-Rosa de 2, 3 e 4 minutos (M+2, M+3, M+4) no Betão ---
   if (lastPink) {
     const pinkMinute = lastPink.minute;
     const diffMinutes = (currentMinute - pinkMinute + 60) % 60;
 
-    if (diffMinutes <= 3) {
-      const targetMin = (pinkMinute + (diffMinutes <= 1 ? 2 : 3)) % 60;
-      const baseProb = mode === 'SNIPER_CONSERVADOR' ? 98.2 : mode === 'MODERADO' ? 95.1 : 92.4;
+    // Janela de projeção pós-rosa: 2, 3 e 4 minutos após a vela rosa (até M+4)
+    if (diffMinutes <= 4) {
+      let targetOffset: number;
+      let stepLabel: string;
+
+      if (diffMinutes <= 2) {
+        targetOffset = 2;
+        stepLabel = '1ª Projeção (M+2)';
+      } else if (diffMinutes === 3) {
+        targetOffset = 3;
+        stepLabel = '2ª Projeção (M+3)';
+      } else {
+        targetOffset = 4;
+        stepLabel = '3ª Projeção (M+4)';
+      }
+
+      const targetMin = (pinkMinute + targetOffset) % 60;
+      const baseProb = mode === 'SNIPER_CONSERVADOR' ? 98.4 : mode === 'MODERADO' ? 95.3 : 92.8;
       const safeExit = mode === 'SNIPER_CONSERVADOR' ? 1.50 : 2.00;
 
       return {
-        id: `sig-m23-${lastPink.id}`,
+        id: `sig-m234-${lastPink.id}-${targetOffset}`,
         targetMinute: targetMin,
         targetMinuteFormatted: formatMinute(targetMin),
         targetTimeFormatted: `${String(currentHour).padStart(2, '0')}:${String(targetMin).padStart(2, '0')}`,
-        strategy: 'PROJECAO_M_2_3',
-        strategyName: 'Gatilho Pós-Rosa (M+2 / M+3)',
-        description: `Rosa de ${lastPink.multiplier.toFixed(2)}x confirmada no minuto :${String(pinkMinute).padStart(2, '0')} do Betão. Projeção de alta assertividade no minuto :${String(targetMin).padStart(2, '0')}.`,
+        strategy: 'PROJECAO_M_2_3_4',
+        strategyName: `Projeção Pós-Rosa (${stepLabel})`,
+        description: `Rosa de ${lastPink.multiplier.toFixed(2)}x confirmada exatamente às ${lastPink.timeFormatted} no Betão. Projeção ativa na janela de 2, 3 e 4 minutos (alvo atual: minuto :${String(targetMin).padStart(2, '0')}).`,
         probability: Number(baseProb.toFixed(1)),
         confidenceTier: baseProb >= 97 ? 'EXTREMA (98%+)' : 'MUITO ALTA',
         recommendedSafeExit: safeExit,

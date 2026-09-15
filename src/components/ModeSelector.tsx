@@ -42,7 +42,7 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
       id: 'ALVO_ROSA',
       title: '🌸 Caçador de Rosa',
       badge: 'Velas 10.00x+',
-      desc: 'Projeção de velas altas nos minutos simétricos e M+2/M+3.',
+      desc: 'Projeção de velas altas nos minutos simétricos e M+2, M+3 e M+4.',
       icon: Sparkles,
       color: 'text-fuchsia-400',
       borderActive: 'border-fuchsia-500 bg-fuchsia-950/40 text-white',

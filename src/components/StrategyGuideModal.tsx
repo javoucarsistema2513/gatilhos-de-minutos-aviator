@@ -50,10 +50,10 @@ export const StrategyGuideModal: React.FC<StrategyGuideModalProps> = ({
           <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
             <h4 className="font-bold text-white flex items-center gap-1.5 text-sm">
               <Sparkles className="w-4 h-4 text-fuchsia-400" />
-              2. Projeção M+2 e M+3 pós-Rosa
+              2. Projeção M+2, M+3 e M+4 pós-Rosa (2, 3 e 4 Minutos)
             </h4>
             <p className="mt-1 text-slate-400">
-              Uma das estratégias mais consolidadas entre jogadores do Betão: após uma vela rosa, projeta-se nova entrada em <strong>+2 minutos</strong> ou <strong>+3 minutos</strong> após a vela pagadora.
+              Estratégia consolidada na mesa do Betão: após uma vela rosa (≥ 10.00x), projeta-se novas entradas na sequência em <strong>+2 minutos, +3 minutos e +4 minutos</strong> após a vela pagadora.
             </p>
           </div>
 

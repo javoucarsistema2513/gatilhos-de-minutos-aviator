@@ -25,8 +25,9 @@ export interface RoundData {
 
 export type TriggerStrategy = 
   | 'MINUTO_IGUAL'     // Repetição do mesmo minuto ou dígito final (ex: :14 -> :24, :34)
-  | 'PROJECAO_M_2_3'   // Gatilho pós-rosa M+2, M+3
-  | 'PROJECAO_M_5'     // Gatilho expansão M+5
+  | 'PROJECAO_M_2_3_4' // Gatilho pós-rosa 2, 3 e 4 minutos (M+2, M+3, M+4)
+  | 'PROJECAO_M_2_3'   // Legado para compatibilidade
+  | 'PROJECAO_M_5'     // Legado para compatibilidade
   | 'MINUTO_ESPELHO'   // Inversão de dígitos (ex: :12 -> :21)
   | 'RECUPERACAO_BLUE' // Quebra de sequência fria (4+ azuis)
   | 'PADRAO_XADREZ';   // Alternância consistente
