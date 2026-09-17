@@ -35,6 +35,8 @@ export type TriggerStrategy =
 
 export type SignalStatus = 'PENDING' | 'ACTIVE' | 'GREEN' | 'RED';
 
+export type ExpectedCandleTier = 'purple' | 'pink';
+
 export interface TriggerSignal {
   id: string;
   targetMinute: number; // minuto da entrada (ex: 47)
@@ -45,8 +47,10 @@ export interface TriggerSignal {
   description: string;
   probability: number; // porcentagem de assertividade ex: 98.4
   confidenceTier: 'ALTA' | 'MUITO ALTA' | 'EXTREMA (98%+)';
-  recommendedSafeExit: number; // ex: 1.50 ou 2.00
-  recommendedTarget: number; // ex: 5.00 ou 10.00
+  recommendedSafeExit: number; // 2.00x para cima (mínimo de 2.00x)
+  recommendedTarget: number; // ex: 3.50 para roxa ou 10.00 para rosa
+  expectedTier: ExpectedCandleTier; // 'purple' = Vela Roxa (2.00x a 9.99x) | 'pink' = Vela Rosa (10.00x+)
+  expectedTierLabel: string; // "Vela Roxa (2.00x - 9.99x)" ou "Vela Rosa (10.00x+)"
   maxAttempts: number; // até 2 tentativas no minuto
   entryWindowSeconds: string; // ex: "1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s"
   galeAdvice: string; // orientação de proteção no Betão

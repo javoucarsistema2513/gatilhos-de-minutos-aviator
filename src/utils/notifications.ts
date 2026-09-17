@@ -120,7 +120,7 @@ class NotificationService {
   public notifyPrepare(targetMinuteFormatted: string, secondsRemaining: number) {
     this.sendNotification({
       title: `🟡 PREPARAR NO BETÃO! Minuto ${targetMinuteFormatted}`,
-      body: `Faltam ${secondsRemaining}s! Abra o Aviator no Betão e confira o Auto-Cashout em 1.50x.`,
+      body: `Faltam ${secondsRemaining}s! Abra o Aviator no Betão e confira o Auto-Cashout em 2.00x.`,
       tag: 'betao-stage-alert',
       renotify: true,
       requireInteraction: true,

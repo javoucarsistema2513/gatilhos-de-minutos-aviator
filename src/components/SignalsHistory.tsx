@@ -89,12 +89,21 @@ export const SignalsHistory: React.FC<SignalsHistoryProps> = ({
                       <span className="font-bold text-white font-mono">
                         Minuto {sig.targetMinuteFormatted} ({sig.targetTimeFormatted})
                       </span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${
+                          sig.expectedTier === 'pink'
+                            ? 'bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-500/50'
+                            : 'bg-purple-950/80 text-purple-300 border-purple-500/50'
+                        }`}
+                      >
+                        {sig.expectedTier === 'pink' ? '🌸 Vela Rosa (10x+)' : '💜 Vela Roxa (2x-9.99x)'}
+                      </span>
                       <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
                         {sig.strategyName}
                       </span>
                     </div>
                     <span className="text-[11px] text-slate-400 block">
-                      Probabilidade calculada: <strong className="text-emerald-400">{sig.probability}%</strong> | Saída: {sig.recommendedSafeExit.toFixed(2)}x
+                      Probabilidade calculada: <strong className="text-emerald-400">{sig.probability}%</strong> | Saída Segura: <strong className="text-sky-300">{sig.recommendedSafeExit.toFixed(2)}x</strong>
                     </span>
                   </div>
                 </div>

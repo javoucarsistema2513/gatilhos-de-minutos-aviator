@@ -96,6 +96,27 @@ export const ActiveSignalCard: React.FC<ActiveSignalCardProps> = ({
           <span className="text-[11px] font-semibold text-slate-300 bg-slate-800/90 border border-slate-700 px-2 py-0.5 rounded-lg">
             {signal.strategyName}
           </span>
+
+          {/* Badge de Vela Alvo (Roxa vs Rosa) - Sem Inversão */}
+          <span
+            className={`inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-xl shadow-xs border ${
+              signal.expectedTier === 'pink'
+                ? 'bg-fuchsia-950/90 text-fuchsia-300 border-fuchsia-500/70 animate-pulse'
+                : 'bg-purple-950/90 text-purple-300 border-purple-500/70'
+            }`}
+          >
+            {signal.expectedTier === 'pink' ? (
+              <>
+                <Sparkles className="w-3.5 h-3.5 text-fuchsia-400" />
+                <span>🌸 ALVO: VELA ROSA (10x+)</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-3.5 h-3.5 text-purple-400" />
+                <span>💜 ALVO: VELA ROXA (2x a 9.99x)</span>
+              </>
+            )}
+          </span>
         </div>
 
         {/* Nível de Confiança */}
@@ -243,22 +264,36 @@ export const ActiveSignalCard: React.FC<ActiveSignalCardProps> = ({
             </span>
           </div>
           <span className="text-[10px] font-black text-sky-300 bg-sky-950 border border-sky-500/50 px-2 py-1 rounded-md">
-            98% DE GREEN
+            PROTEÇÃO 2.00x+
           </span>
         </div>
 
-        {/* Saída 2: Alvo de Vela Rosa */}
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-fuchsia-500/40">
+        {/* Saída 2: Alvo Principal (Vela Rosa ou Roxa) */}
+        <div
+          className={`flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border ${
+            signal.expectedTier === 'pink' ? 'border-fuchsia-500/50' : 'border-purple-500/50'
+          }`}
+        >
           <div>
             <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block">
-              2ª Aposta: Alvo Vela Alta
+              2ª Aposta: {signal.expectedTier === 'pink' ? 'Alvo Vela Rosa' : 'Alvo Vela Roxa'}
             </span>
-            <span className="text-lg font-black text-fuchsia-400 font-mono">
+            <span
+              className={`text-lg font-black font-mono ${
+                signal.expectedTier === 'pink' ? 'text-fuchsia-400' : 'text-purple-400'
+              }`}
+            >
               {signal.recommendedTarget.toFixed(2)}x+
             </span>
           </div>
-          <span className="text-[10px] font-black text-fuchsia-300 bg-fuchsia-950 border border-fuchsia-500/50 px-2 py-1 rounded-md">
-            LUCRO LIMPO
+          <span
+            className={`text-[10px] font-black px-2 py-1 rounded-md border ${
+              signal.expectedTier === 'pink'
+                ? 'text-fuchsia-300 bg-fuchsia-950/80 border-fuchsia-500/50'
+                : 'text-purple-300 bg-purple-950/80 border-purple-500/50'
+            }`}
+          >
+            {signal.expectedTier === 'pink' ? 'VELA ROSA 🌸' : 'VELA ROXA 💜'}
           </span>
         </div>
       </div>

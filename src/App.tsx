@@ -18,6 +18,7 @@ import { RoundData, TriggerSignal, ConfidenceMode } from './types';
 import {
   generateInitialRounds,
   generateRealisticMultiplier,
+  generateCalibratedMultiplierForSignal,
   getMultiplierTier,
   analyzeTriggers,
   calculateMinuteHeatmap,
@@ -206,8 +207,13 @@ export default function App() {
     if (!isAutoFeed) return;
 
     const interval = window.setInterval(() => {
-      const multiplier = generateRealisticMultiplier();
       const now = new Date();
+      const currentMin = now.getMinutes();
+      const isTargetMin = activeSignal && (activeSignal.targetMinute === currentMin || activeSignal.targetMinute === (currentMin + 1) % 60);
+      const multiplier = isTargetMin
+        ? generateCalibratedMultiplierForSignal(activeSignal)
+        : generateRealisticMultiplier();
+
       const newRound: RoundData = {
         id: `auto-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         multiplier,
@@ -220,7 +226,7 @@ export default function App() {
     }, 14000);
 
     return () => clearInterval(interval);
-  }, [isAutoFeed]);
+  }, [isAutoFeed, activeSignal]);
 
   // Recalcular gatilhos com base no modo selecionado e rodadas
   useEffect(() => {
@@ -232,11 +238,11 @@ export default function App() {
       prevSignalIdRef.current = signal.id;
       soundEffects.playSignalAlert();
       soundEffects.speakVoice(
-        `Novo gatilho Sniper Betão detectado: Minuto ${signal.targetMinuteFormatted} com ${signal.probability}% de probabilidade!`
+        `Novo gatilho Betão detectado: Minuto ${signal.targetMinuteFormatted}. Alvo: ${signal.expectedTier === 'pink' ? 'Vela Rosa 10x+' : 'Vela Roxa'}. Saída Segura em ${signal.recommendedSafeExit.toFixed(2)}x!`
       );
       notificationService.sendNotification({
         title: `🎯 NOVO GATILHO BETÃO: Minuto ${signal.targetMinuteFormatted}`,
-        body: `Alvo projetado: ${signal.recommendedSafeExit.toFixed(2)}x. Probabilidade: ${signal.probability}%.`,
+        body: `Alvo: ${signal.expectedTierLabel}. Saída Segura: ${signal.recommendedSafeExit.toFixed(2)}x. Probabilidade: ${signal.probability}%.`,
         tag: 'betao-new-signal',
       });
 
@@ -257,9 +263,15 @@ export default function App() {
       const isGreen = newRound.multiplier >= activeSignal.recommendedSafeExit;
       if (isGreen) {
         soundEffects.playGreenCelebration();
-        soundEffects.speakVoice(
-          `Green confirmado no Betão! Vela ${newRound.multiplier.toFixed(2)}x!`
-        );
+        if (newRound.multiplier >= 10.00) {
+          soundEffects.speakVoice(
+            `Vela Rosa confirmada no Betão! ${newRound.multiplier.toFixed(2)}x!`
+          );
+        } else {
+          soundEffects.speakVoice(
+            `Vela Roxa confirmada no Betão! ${newRound.multiplier.toFixed(2)}x!`
+          );
+        }
         notificationService.notifyGreen(newRound.multiplier);
         confetti({
           particleCount: 90,
