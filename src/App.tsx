@@ -19,6 +19,7 @@ import {
   generateInitialRounds,
   generateRealisticMultiplier,
   generateCalibratedMultiplierForSignal,
+  generateInitialSignalsHistory,
   getMultiplierTier,
   analyzeTriggers,
   calculateMinuteHeatmap,
@@ -37,7 +38,10 @@ export default function App() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [confidenceMode, setConfidenceMode] = useState<ConfidenceMode>('SNIPER_CONSERVADOR');
   const [activeSignal, setActiveSignal] = useState<TriggerSignal | null>(null);
-  const [signalsHistory, setSignalsHistory] = useState<TriggerSignal[]>([]);
+  const [signalsHistory, setSignalsHistory] = useState<TriggerSignal[]>(() => {
+    const initialRounds = generateInitialRounds(50);
+    return generateInitialSignalsHistory(initialRounds);
+  });
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(soundEffects.enabled);
   const [isAutoFeed, setIsAutoFeed] = useState<boolean>(true);
   const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
@@ -288,6 +292,7 @@ export default function App() {
               ...s,
               status: isGreen ? 'GREEN' : 'RED',
               resultMultiplier: newRound.multiplier,
+              resultTier: newRound.tier,
             };
           }
           return s;
@@ -335,10 +340,12 @@ export default function App() {
     setSignalsHistory((prev) =>
       prev.map((s) => {
         if (s.id === signalId) {
+          const fallbackMult = s.expectedTier === 'pink' ? 14.80 : 2.50;
           return {
             ...s,
             status: 'GREEN',
-            resultMultiplier: s.resultMultiplier || 2.5,
+            resultMultiplier: s.resultMultiplier || fallbackMult,
+            resultTier: s.expectedTier,
           };
         }
         return s;

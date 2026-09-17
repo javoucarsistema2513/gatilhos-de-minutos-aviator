@@ -57,6 +57,7 @@ export interface TriggerSignal {
   status: SignalStatus;
   createdAt: number;
   resultMultiplier?: number;
+  resultTier?: 'blue' | 'purple' | 'pink';
   triggerRoundMultiplier?: number;
 }
 
