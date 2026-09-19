@@ -10,6 +10,7 @@ import { BankrollCalculator } from './components/BankrollCalculator';
 import { ManualEntryModal } from './components/ManualEntryModal';
 import { StrategyGuideModal } from './components/StrategyGuideModal';
 import { BetaoLiveBridgeModal } from './components/BetaoLiveBridgeModal';
+import { BetaoLiveFrame, OFFICIAL_BETAO_CLOUDFRONT_URL } from './components/BetaoLiveFrame';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { BetaoSyncBar } from './components/BetaoSyncBar';
 import { ModeSelector } from './components/ModeSelector';
@@ -43,10 +44,11 @@ export default function App() {
     return generateInitialSignalsHistory(initialRounds);
   });
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(soundEffects.enabled);
-  const [isAutoFeed, setIsAutoFeed] = useState<boolean>(true);
+  const [isAutoFeed, setIsAutoFeed] = useState<boolean>(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState<boolean>(false);
   const [isBridgeModalOpen, setIsBridgeModalOpen] = useState<boolean>(false);
+  const [showLiveFrame, setShowLiveFrame] = useState<boolean>(true);
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
   const [liveRoundsCount, setLiveRoundsCount] = useState<number>(0);
   const [lastLiveRoundTime, setLastLiveRoundTime] = useState<string | undefined>(undefined);
@@ -56,7 +58,7 @@ export default function App() {
   const hasSpokenPrepareRef = useRef<string | null>(null);
   const hasSpokenEnterRef = useRef<string | null>(null);
 
-  // Receptor de rodadas em tempo real da mesa do Betão (postMessage & BroadcastChannel)
+  // Receptor de rodadas em tempo real da mesa oficial CloudFront (postMessage, BroadcastChannel, localStorage)
   useEffect(() => {
     const processIncomingRound = (mult: number, timestamp?: number) => {
       const ts = timestamp || Date.now();
@@ -113,6 +115,18 @@ export default function App() {
 
     window.addEventListener('message', handleWindowMessage);
 
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'betao_last_round' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && typeof parsed.multiplier === 'number') {
+            processIncomingRound(parsed.multiplier, parsed.timestamp);
+          }
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel('betao_aviator_sync');
@@ -125,6 +139,7 @@ export default function App() {
 
     return () => {
       window.removeEventListener('message', handleWindowMessage);
+      window.removeEventListener('storage', handleStorage);
       if (bc) bc.close();
     };
   }, []);
@@ -321,6 +336,19 @@ export default function App() {
     handleNewRound(newRound);
   };
 
+  // Substituir todo o histórico com as velas exatas do site CloudFront
+  const handleReplaceRounds = (newRounds: RoundData[]) => {
+    if (newRounds.length === 0) return;
+    setRounds(newRounds);
+    setLiveRoundsCount((prev) => prev + newRounds.length);
+    setIsLiveConnected(true);
+    const last = newRounds[newRounds.length - 1];
+    if (last) {
+      setLastLiveRoundTime(last.timeFormatted);
+    }
+    soundEffects.playBeep(920, 0.15, 'sine');
+  };
+
   // Validar Green manualmente
   const handleConfirmGreen = (signalId: string) => {
     soundEffects.playGreenCelebration();
@@ -385,6 +413,8 @@ export default function App() {
         currentStreak={stats.currentStreak}
         onOpenBetaoBridge={() => setIsBridgeModalOpen(true)}
         isLiveConnected={isLiveConnected}
+        onToggleLiveFrame={() => setShowLiveFrame((prev) => !prev)}
+        isLiveFrameOpen={showLiveFrame}
       />
 
       {/* Aviator Horizontal Multipliers Bar */}
@@ -398,64 +428,94 @@ export default function App() {
         {/* Banner de Notificações em Segundo Plano & Desbloqueio de Voz */}
         <VoiceNotificationBanner onUnlockAudio={() => soundEffects.unlock()} />
 
-        {/* Indicador de Conexão com a Mesa do Betão */}
+        {/* Indicador de Conexão com a Mesa Oficial CloudFront */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs shadow-inner">
           <div className="flex items-center gap-2">
             <span
               className={`w-2.5 h-2.5 rounded-full ${
                 isLiveConnected
                   ? 'bg-emerald-400 shadow-md shadow-emerald-500/50 animate-pulse'
-                  : 'bg-orange-500 animate-pulse'
+                  : 'bg-rose-500 animate-pulse'
               }`}
             />
             <div className="flex flex-wrap items-center gap-1.5 text-slate-300">
-              <span className="font-bold text-white">Mesa Betão:</span>
+              <span className="font-bold text-white">Mesa Oficial (CloudFront):</span>
               <a
-                href="https://betao.bet.br/games/aviator-spribe"
+                href={OFFICIAL_BETAO_CLOUDFRONT_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="text-rose-400 hover:text-rose-300 font-mono underline flex items-center gap-0.5"
+                className="text-rose-400 hover:text-rose-300 font-mono underline flex items-center gap-0.5 text-[11px]"
               >
-                betao.bet.br/games/aviator-spribe
+                d18ets18cyzpod.cloudfront.net (id=483312306)
               </a>
               <span className="text-[11px] text-slate-400 hidden md:inline">
                 {isLiveConnected
-                  ? `• Conectado ao vivo (${liveRoundsCount} velas sincronizadas)`
-                  : '• Histórico sincronizado'}
+                  ? `• Conectado ao vivo (${liveRoundsCount} velas recebidas)`
+                  : '• Siga as velas exatas desta mesa'}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowLiveFrame((prev) => !prev)}
+              className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition flex items-center gap-1 ${
+                showLiveFrame
+                  ? 'bg-amber-950/40 border-amber-500/50 text-amber-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>{showLiveFrame ? 'Ocultar Mesa' : '📺 Exibir Mesa Ao Vivo'}</span>
+            </button>
+            <button
               id="open-sync-bridge-btn"
               onClick={() => setIsBridgeModalOpen(true)}
               className="px-2.5 py-1 rounded-lg bg-rose-600/20 border border-rose-500/40 text-rose-300 hover:bg-rose-600/30 text-xs font-bold transition flex items-center gap-1"
             >
-              <span>{isLiveConnected ? 'Mesa Sincronizada' : 'Sincronizar Histórico'}</span>
+              <span>{isLiveConnected ? 'Sincronizado' : 'Sincronizar'}</span>
             </button>
             <button
               onClick={() => setIsAutoFeed((prev) => !prev)}
               className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition ${
-                isAutoFeed
-                  ? 'border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white'
+                !isAutoFeed
+                  ? 'border-emerald-500/40 bg-emerald-950/40 text-emerald-300'
                   : 'border-amber-500/40 bg-amber-950/40 text-amber-300'
               }`}
-              title="Alternar fluxo automático calibrado para o Betão"
+              title={
+                !isAutoFeed
+                  ? 'Modo Mesa Real Ativo: somente velas que saem na mesa informada'
+                  : 'Modo Treino: gerando velas simuladas'
+              }
             >
-              Fluxo: {isAutoFeed ? 'Ativo' : 'Pausado'}
+              {!isAutoFeed ? 'Modo: Mesa Real' : 'Modo: Treino'}
             </button>
           </div>
         </div>
+
+        {/* Visualizador da Mesa Oficial Embutida e Fast Capture */}
+        <BetaoLiveFrame
+          isOpen={showLiveFrame}
+          onToggleOpen={() => setShowLiveFrame((prev) => !prev)}
+          onAddRound={handleNewRound}
+          onReplaceRounds={handleReplaceRounds}
+          isLiveConnected={isLiveConnected}
+          liveRoundsCount={liveRoundsCount}
+          lastLiveRoundTime={lastLiveRoundTime}
+        />
 
         {/* Barra de Sincronia Instantânea com a Mesa do Betão */}
         <BetaoSyncBar
           climate={tableClimate}
           onAddRound={handleNewRound}
           onBatchAddRounds={handleBatchAddRounds}
+          onReplaceRounds={handleReplaceRounds}
           onSyncClock={() => setCurrentDate(new Date())}
           onOpenBetaoBridge={() => setIsBridgeModalOpen(true)}
+          onToggleLiveFrame={() => setShowLiveFrame((prev) => !prev)}
+          isLiveFrameOpen={showLiveFrame}
           isLiveConnected={isLiveConnected}
+          feedMode={isAutoFeed ? 'SIMULATION' : 'REAL_BETAO'}
+          onToggleFeedMode={() => setIsAutoFeed((prev) => !prev)}
         />
 
         {/* Seletor de Modo de Probabilidade (Sniper 98% / Moderado / Rosa) */}
@@ -532,6 +592,7 @@ export default function App() {
         isOpen={isBridgeModalOpen}
         onClose={() => setIsBridgeModalOpen(false)}
         onBatchAddRounds={handleBatchAddRounds}
+        onReplaceRounds={handleReplaceRounds}
         onAddSingleRound={(mult, src) => handleAddSingleRound(mult, src)}
         isLiveConnected={isLiveConnected}
         liveRoundsCount={liveRoundsCount}

@@ -11,6 +11,8 @@ interface HeaderProps {
   currentStreak: number;
   onOpenBetaoBridge?: () => void;
   isLiveConnected?: boolean;
+  onToggleLiveFrame?: () => void;
+  isLiveFrameOpen?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,7 +23,12 @@ export const Header: React.FC<HeaderProps> = ({
   currentStreak,
   onOpenBetaoBridge,
   isLiveConnected = false,
+  onToggleLiveFrame,
+  isLiveFrameOpen = false,
 }) => {
+  const officialGameUrl =
+    'https://d18ets18cyzpod.cloudfront.net/home/embedded?id=483312306&currency=BRL&fixed.isSaveShort=true&fixed.isHideDomain=1';
+
   return (
     <header
       id="app-header"
@@ -37,10 +44,24 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <h1 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-1">
                 GATILHOS <span className="text-rose-500 font-extrabold">AVIATOR</span>
               </h1>
+              {onToggleLiveFrame && (
+                <button
+                  onClick={onToggleLiveFrame}
+                  className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider transition ${
+                    isLiveFrameOpen
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
+                      : 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30'
+                  }`}
+                  title="Exibir ou ocultar mesa oficial embutida"
+                >
+                  <Radio className="w-2.5 h-2.5 text-rose-400 animate-pulse" />
+                  <span>{isLiveFrameOpen ? 'MESA ABERTA' : '📺 VER MESA'}</span>
+                </button>
+              )}
               <button
                 onClick={onOpenBetaoBridge}
                 className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider transition ${
@@ -48,26 +69,22 @@ export const Header: React.FC<HeaderProps> = ({
                     ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/30'
                     : 'bg-orange-500/20 border-orange-500/40 text-orange-400 hover:bg-orange-500/30'
                 }`}
-                title="Sincronizar com betao.bet.br/games/aviator-spribe"
+                title="Sincronizar com a mesa oficial d18ets18cyzpod.cloudfront.net"
               >
                 <Link2 className="w-2.5 h-2.5" />
-                <span>{isLiveConnected ? 'BETÃO CONECTADO' : 'MESA BETÃO'}</span>
+                <span>{isLiveConnected ? 'CLOUDFRONT CONECTADO' : 'SINCRONIZAR'}</span>
               </button>
-              <span className="hidden sm:inline-flex items-center gap-1 rounded bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 text-[10px] font-bold text-rose-400">
-                <Radio className="w-2.5 h-2.5 animate-pulse text-rose-500" />
-                AO VIVO
-              </span>
             </div>
             <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-400">
               <span>Mesa Oficial:</span>
               <a
-                href="https://betao.bet.br/games/aviator-spribe"
+                href={officialGameUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="text-rose-400 hover:text-rose-300 underline font-mono flex items-center gap-0.5"
-                title="Abrir mesa betao.bet.br/games/aviator-spribe"
+                title="Abrir mesa oficial CloudFront em nova aba"
               >
-                betao.bet.br/games/aviator-spribe
+                d18ets18cyzpod.cloudfront.net
                 <ExternalLink className="w-2.5 h-2.5 inline" />
               </a>
             </div>

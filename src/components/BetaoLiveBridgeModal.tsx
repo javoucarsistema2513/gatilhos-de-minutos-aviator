@@ -20,6 +20,7 @@ interface BetaoLiveBridgeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onBatchAddRounds: (rounds: RoundData[]) => void;
+  onReplaceRounds?: (rounds: RoundData[]) => void;
   onAddSingleRound: (multiplier: number, source?: 'BETAO_LIVE' | 'BETAO_SYNC') => void;
   isLiveConnected: boolean;
   liveRoundsCount: number;
@@ -30,6 +31,7 @@ export const BetaoLiveBridgeModal: React.FC<BetaoLiveBridgeModalProps> = ({
   isOpen,
   onClose,
   onBatchAddRounds,
+  onReplaceRounds,
   onAddSingleRound,
   isLiveConnected,
   liveRoundsCount,
@@ -41,45 +43,83 @@ export const BetaoLiveBridgeModal: React.FC<BetaoLiveBridgeModalProps> = ({
 
   if (!isOpen) return null;
 
-  const betaoUrl = 'https://betao.bet.br/games/aviator-spribe';
+  const betaoUrl = 'https://d18ets18cyzpod.cloudfront.net/home/embedded?id=483312306&currency=BRL&fixed.isSaveShort=true&fixed.isHideDomain=1';
 
-  // Código do extrator oficial do Betão Aviator
+  // Código do extrator oficial do Betão Aviator (CloudFront)
   const extractorCode = `javascript:(function(){
-  console.log("%c✈️ SINCRONIZADOR BETAO AVIATOR ATIVADO", "background:#e11d48;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px");
+  console.log("%c✈️ SINCRONIZADOR AO VIVO ATIVADO (CLOUDFRONT / BETÃO)", "background:#e11d48;color:#fff;font-weight:bold;padding:6px 12px;border-radius:6px;font-size:13px");
   let lastMult = null;
-  function notify(raw){
-    const clean = String(raw).replace(/[^0-9.,]/g,'').replace(',','.');
-    const val = parseFloat(clean);
-    if(isNaN(val)||val<1.0||val===lastMult)return;
+  let count = 0;
+  let badge = document.getElementById('betao-radar-sync-badge');
+  if(!badge){
+    badge = document.createElement('div');
+    badge.id = 'betao-radar-sync-badge';
+    badge.style.cssText = 'position:fixed;top:8px;left:8px;z-index:9999999;background:rgba(11,15,25,0.95);border:2px solid #10b981;border-radius:10px;padding:6px 12px;color:#fff;font-family:system-ui,-apple-system,sans-serif;font-size:11px;font-weight:bold;box-shadow:0 4px 20px rgba(0,0,0,0.8);pointer-events:none;display:flex;align-items:center;gap:6px;';
+    badge.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 8px #10b981"></span> RADAR CONECTADO: Aguardando velas...';
+    document.body.appendChild(badge);
+  }
+  function sendRound(val){
+    if(!val || isNaN(val) || val < 1.0 || val === lastMult) return;
     lastMult = val;
-    const data = {type:'BETAO_ROUND',multiplier:val,timestamp:Date.now(),sourceUrl:'${betaoUrl}'};
-    if(window.opener&&!window.opener.closed){
-      window.opener.postMessage(data,'*');
-      console.log("%c✈️ [BETAO] Vela enviada ao Radar:", "color:#10b981;font-weight:bold;", val+"x");
+    count++;
+    if(badge){
+      const color = val >= 10 ? '#f43f5e' : (val >= 2 ? '#a855f7' : '#38bdf8');
+      badge.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:'+color+';display:inline-block"></span> VELA ENVIADA: <strong style="color:'+color+';font-size:13px">'+val.toFixed(2)+'x</strong> ('+count+' enviadas)';
+    }
+    const payload = {
+      type: 'BETAO_ROUND',
+      multiplier: val,
+      timestamp: Date.now(),
+      sourceUrl: '${betaoUrl}',
+      source: 'BETAO_LIVE'
+    };
+    if(window.opener && !window.opener.closed){
+      window.opener.postMessage(payload, '*');
     }
     try{
       const bc = new BroadcastChannel('betao_aviator_sync');
-      bc.postMessage(data);
+      bc.postMessage(payload);
       bc.close();
     }catch(e){}
+    try{
+      localStorage.setItem('betao_last_round', JSON.stringify(payload));
+    }catch(e){}
+    console.log("%c🎯 [RADAR] Vela da Mesa:", "color:#10b981;font-weight:bold;", val+"x");
   }
-  function observe(doc){
-    if(!doc)return;
-    const observer = new MutationObserver(mutations=>{
-      for(const m of mutations){
-        for(const n of m.addedNodes){
-          if(n.nodeType===1){
-            const txt=(n.innerText||n.textContent||'').trim();
-            if(txt.includes('x')||/\\d+[.,]\\d+/.test(txt)){notify(txt);}
+  function scan(){
+    const selectors = [
+      '.payouts-block .bubble-multiplier',
+      '.bubble-multiplier',
+      '.payout',
+      'app-bubble-multiplier',
+      '.result-history .bubble',
+      'div[class*="bubble"]',
+      'div[class*="payout"]',
+      'span[class*="multiplier"]'
+    ];
+    for(const sel of selectors){
+      const list = document.querySelectorAll(sel);
+      if(list.length > 0){
+        const text = (list[0].innerText || list[0].textContent || '').trim();
+        const m = text.match(/(\\d+[.,]\\d+)x?/i);
+        if(m){
+          const n = parseFloat(m[1].replace(',','.'));
+          if(!isNaN(n) && n >= 1.0){
+            sendRound(n);
+            break;
           }
         }
       }
-    });
-    observer.observe(doc.body||doc.documentElement,{childList:true,subtree:true});
-    doc.querySelectorAll('iframe').forEach(ifr=>{try{if(ifr.contentDocument)observe(ifr.contentDocument);}catch(e){}});
+    }
   }
-  observe(document);
-  alert("✅ Extrator Betão Aviator Conectado! As rodadas da sua mesa serão enviadas ao Radar em tempo real.");
+  const obs = new MutationObserver(()=>scan());
+  obs.observe(document.body || document.documentElement, {childList:true, subtree:true, characterData:true});
+  document.querySelectorAll('iframe').forEach(ifr=>{
+    try{ if(ifr.contentDocument) obs.observe(ifr.contentDocument.body, {childList:true, subtree:true, characterData:true}); }catch(e){}
+  });
+  setInterval(scan, 800);
+  scan();
+  alert("✅ Extrator Conectado com Sucesso à Mesa! As velas desta tela serão transmitidas instantaneamente para o seu Radar.");
 })();`;
 
   const handleCopyExtractor = async () => {
@@ -88,14 +128,12 @@ export const BetaoLiveBridgeModal: React.FC<BetaoLiveBridgeModalProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch (e) {
-      // Fallback
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     }
   };
 
   const handleOpenBetao = () => {
-    // Abrir Betão mantendo window.opener conectado para postMessage direto
     window.open(betaoUrl, 'betao_aviator_window');
   };
 
@@ -103,6 +141,15 @@ export const BetaoLiveBridgeModal: React.FC<BetaoLiveBridgeModalProps> = ({
     const rounds = parseBatchCandles(pasteInput);
     if (rounds.length > 0) {
       onBatchAddRounds(rounds);
+      setPasteInput('');
+      onClose();
+    }
+  };
+
+  const handleApplyReplace = () => {
+    const rounds = parseBatchCandles(pasteInput);
+    if (rounds.length > 0 && onReplaceRounds) {
+      onReplaceRounds(rounds);
       setPasteInput('');
       onClose();
     }
@@ -132,14 +179,14 @@ export const BetaoLiveBridgeModal: React.FC<BetaoLiveBridgeModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Conexão direta com a mesa:{' '}
+                Mesa Oficial (CloudFront):{' '}
                 <a
                   href={betaoUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-rose-400 underline hover:text-rose-300 font-mono"
+                  className="text-rose-400 underline hover:text-rose-300 font-mono text-[11px]"
                 >
-                  betao.bet.br/games/aviator-spribe
+                  d18ets18cyzpod.cloudfront.net (id=483312306)
                 </a>
               </p>
             </div>
@@ -167,15 +214,15 @@ export const BetaoLiveBridgeModal: React.FC<BetaoLiveBridgeModalProps> = ({
             <div>
               <span className="text-xs font-bold text-white block">
                 {isLiveConnected
-                  ? '🟢 Sincronizado com betao.bet.br'
-                  : 'Pronto para receber rodadas do Betão'}
+                  ? '🟢 Sincronizado com a Mesa CloudFront'
+                  : 'Pronto para receber rodadas da Mesa Oficial'}
               </span>
               <span className="text-[11px] text-slate-400">
                 {liveRoundsCount > 0
                   ? `${liveRoundsCount} rodadas recebidas da mesa oficial${
                       lastLiveRoundTime ? ` (Última às ${lastLiveRoundTime})` : ''
                     }`
-                  : 'Abra a mesa do Betão abaixo para sincronizar as velas'}
+                  : 'Abra a mesa oficial ou cole as velas para calibrar'}
               </span>
             </div>
           </div>
@@ -185,7 +232,7 @@ export const BetaoLiveBridgeModal: React.FC<BetaoLiveBridgeModalProps> = ({
             className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm shadow-rose-900 shrink-0 active:scale-95"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            Abrir Betão
+            Abrir Mesa
           </button>
         </div>
 
@@ -295,19 +342,30 @@ export const BetaoLiveBridgeModal: React.FC<BetaoLiveBridgeModalProps> = ({
                 className="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:border-rose-500 focus:outline-none"
               />
 
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[11px] text-slate-400">
                   {parseBatchCandles(pasteInput).length > 0 &&
                     `✓ ${parseBatchCandles(pasteInput).length} velas válidas identificadas`}
                 </span>
-                <button
-                  onClick={handleApplyPaste}
-                  disabled={!pasteInput.trim()}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs transition flex items-center gap-1.5"
-                >
-                  <ClipboardPaste className="w-3.5 h-3.5" />
-                  Importar Velas do Betão
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleApplyReplace}
+                    disabled={!pasteInput.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-rose-900/40"
+                    title="Substitui todas as velas para que o radar siga exatamente a sequência do site"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Substituir com Velas Exatas
+                  </button>
+                  <button
+                    onClick={handleApplyPaste}
+                    disabled={!pasteInput.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700"
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5" />
+                    Adicionar
+                  </button>
+                </div>
               </div>
             </div>
           )}
