@@ -26,9 +26,19 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="mx-auto flex max-w-7xl items-center justify-between px-2.5 py-2 sm:px-6 sm:py-2.5">
         {/* Brand Logo */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-gradient-to-br from-pink-600 to-purple-800 shadow-md shadow-pink-600/30">
-            <img src="/icon.svg" alt="Radar Icon" className="h-5 w-5 sm:h-6 sm:w-6" />
-            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5 sm:h-3 sm:w-3">
+          <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-slate-900 border border-pink-500/50 shadow-md shadow-pink-600/30 overflow-hidden">
+            <img
+              src="/pwa-192x192.png"
+              alt="Aviator Radar VIP"
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                if (!target.src.endsWith('/icon.svg')) {
+                  target.src = '/icon.svg';
+                }
+              }}
+            />
+            <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5 sm:h-3 sm:w-3">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
               <span className="relative inline-flex h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-pink-500"></span>
             </span>

@@ -46,10 +46,13 @@ export const PWAInstallButton: React.FC = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-700 p-5 shadow-2xl">
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-pink-500" />
-                  Instalar no iPhone / iPad
-                </h3>
+                <div className="flex items-center gap-2.5">
+                  <img src="/pwa-192x192.png" alt="Aviator Radar VIP" className="w-7 h-7 rounded-lg border border-pink-500/40 object-cover" />
+                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4 text-pink-500" />
+                    Instalar no iPhone / iPad
+                  </h3>
+                </div>
                 <button
                   onClick={() => setShowIOSGuide(false)}
                   className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
@@ -112,10 +115,13 @@ export const PWAInstallButton: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-700 p-5 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Download className="w-4 h-4 text-pink-500" />
-                Como Instalar o App
-              </h3>
+              <div className="flex items-center gap-2.5">
+                <img src="/pwa-192x192.png" alt="Aviator Radar VIP" className="w-7 h-7 rounded-lg border border-pink-500/40 object-cover" />
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Download className="w-4 h-4 text-pink-500" />
+                  Como Instalar o App
+                </h3>
+              </div>
               <button
                 onClick={() => setShowGenericGuide(false)}
                 className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
