@@ -9,11 +9,11 @@ export const OfflineIndicator: React.FC = () => {
 
   return (
     <div
-      id="offline-indicator"
-      className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-xl bg-amber-500/95 backdrop-blur-md px-3.5 py-2 text-xs font-semibold text-slate-950 shadow-2xl border border-amber-300"
+      id="pwa-offline-indicator"
+      className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-xl bg-amber-500/95 backdrop-blur-md px-3.5 py-2 text-xs font-semibold text-slate-950 shadow-xl border border-amber-400"
     >
-      <WifiOff className="w-4 h-4 animate-pulse" />
-      <span>Modo Offline — PWA em execução via Cache Local</span>
+      <WifiOff className="w-4 h-4 text-slate-950 animate-pulse" />
+      <span>Modo Offline — Utilizando dados e cálculos em cache local</span>
     </div>
   );
 };

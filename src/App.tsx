@@ -1,621 +1,623 @@
-import React, { useState, useEffect, useRef } from 'react';
-import confetti from 'canvas-confetti';
-import { Header } from './components/Header';
-import { RoundsHistoryBar } from './components/RoundsHistoryBar';
-import { ActiveSignalCard } from './components/ActiveSignalCard';
-import { MinuteHeatmap } from './components/MinuteHeatmap';
-import { BestPayoutHoursMap } from './components/BestPayoutHoursMap';
-import { SignalsHistory } from './components/SignalsHistory';
-import { BankrollCalculator } from './components/BankrollCalculator';
-import { ManualEntryModal } from './components/ManualEntryModal';
-import { StrategyGuideModal } from './components/StrategyGuideModal';
-import { BetaoLiveBridgeModal } from './components/BetaoLiveBridgeModal';
-import { BetaoLiveFrame, OFFICIAL_BETAO_CLOUDFRONT_URL } from './components/BetaoLiveFrame';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Navbar } from './components/Navbar';
+import { FocusedSignalMonitor } from './components/FocusedSignalMonitor';
+import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { BetaoSyncBar } from './components/BetaoSyncBar';
-import { ModeSelector } from './components/ModeSelector';
-import { VoiceNotificationBanner } from './components/VoiceNotificationBanner';
-import { RoundData, TriggerSignal, ConfidenceMode } from './types';
+import { TableSynchronizerModal } from './components/TableSynchronizerModal';
 import {
-  generateInitialRounds,
-  generateRealisticMultiplier,
-  generateCalibratedMultiplierForSignal,
-  generateInitialSignalsHistory,
-  getMultiplierTier,
-  analyzeTriggers,
-  calculateMinuteHeatmap,
-  calculateHourlyPayoutMap,
-  calculateGlobalStats,
-  calculateTableClimate,
-  formatTime,
-} from './utils/aviatorEngine';
-import { soundEffects } from './utils/audio';
-import { notificationService } from './utils/notifications';
-import { BackgroundTicker } from './utils/workerTicker';
-import { HelpCircle, RefreshCw } from 'lucide-react';
+  AviatorCandle,
+  CandleColor,
+  NotificationLog,
+  NotificationSettings,
+  RadarSignal,
+} from './types';
+import {
+  analyzePayingMinutes,
+  calculateStatistics,
+  evaluateLiveSignal,
+  getCandleColor,
+} from './utils/calculator';
+import { playClickSound, playPinkAlertSound, playPurpleAlertSound } from './utils/audio';
 
 export default function App() {
-  const [rounds, setRounds] = useState<RoundData[]>(() => generateInitialRounds(50));
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [confidenceMode, setConfidenceMode] = useState<ConfidenceMode>('SNIPER_CONSERVADOR');
-  const [activeSignal, setActiveSignal] = useState<TriggerSignal | null>(null);
-  const [signalsHistory, setSignalsHistory] = useState<TriggerSignal[]>(() => {
-    const initialRounds = generateInitialRounds(50);
-    return generateInitialSignalsHistory(initialRounds);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState<boolean>(false);
+  const [candles, setCandles] = useState<AviatorCandle[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('aviator_sound_enabled') !== 'false';
   });
-  const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(soundEffects.enabled);
-  const [isAutoFeed, setIsAutoFeed] = useState<boolean>(false);
-  const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
-  const [isGuideModalOpen, setIsGuideModalOpen] = useState<boolean>(false);
-  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState<boolean>(false);
-  const [showLiveFrame, setShowLiveFrame] = useState<boolean>(true);
-  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
-  const [liveRoundsCount, setLiveRoundsCount] = useState<number>(0);
-  const [lastLiveRoundTime, setLastLiveRoundTime] = useState<string | undefined>(undefined);
+  const [isSimulating, setIsSimulating] = useState<boolean>(() => {
+    return localStorage.getItem('aviator_is_simulating') === 'true';
+  });
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number>(20);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  const prevSignalIdRef = useRef<string | null>(null);
-  const prevSecondRef = useRef<number>(-1);
-  const hasSpokenPrepareRef = useRef<string | null>(null);
-  const hasSpokenEnterRef = useRef<string | null>(null);
-
-  // Receptor de rodadas em tempo real da mesa oficial CloudFront (postMessage, BroadcastChannel, localStorage)
-  useEffect(() => {
-    const processIncomingRound = (mult: number, timestamp?: number) => {
-      const ts = timestamp || Date.now();
-      const d = new Date(ts);
-      const timeStr = formatTime(d);
-      const newRound: RoundData = {
-        id: `betao-live-${ts}-${Math.random().toString(36).substring(2, 6)}`,
-        multiplier: mult,
-        timestamp: ts,
-        minute: d.getMinutes(),
-        timeFormatted: timeStr,
-        tier: getMultiplierTier(mult),
-        source: 'BETAO_LIVE',
-      };
-
-      setIsLiveConnected(true);
-      setLiveRoundsCount((prev) => prev + 1);
-      setLastLiveRoundTime(timeStr);
-      setRounds((prev) => [...prev.slice(-99), newRound]);
-
-      // Alerta de vela recebida da mesa
-      soundEffects.playBeep(920, 0.1, 'sine');
+  // Notification Settings (persisted in localStorage)
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => {
+    const saved = localStorage.getItem('aviator_notif_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // fallback
+      }
+    }
+    return {
+      telegram: {
+        enabled: false,
+        botToken: '',
+        chatId: '',
+        notifyOnPurple: true,
+        notifyOnPink: true,
+        notifyOnSuperPink: true,
+        minConfidence: 75,
+      },
+      webhook: {
+        enabled: false,
+        url: '',
+        notifyOnPurple: false,
+        notifyOnPink: true,
+      },
+      browser: {
+        soundEnabled: true,
+        vibrationEnabled: true,
+        desktopNotifications: true,
+      },
     };
+  });
 
-    const handleWindowMessage = (event: MessageEvent) => {
-      if (!event.data) return;
-      if (event.data.type === 'BETAO_ROUND' && typeof event.data.multiplier === 'number') {
-        processIncomingRound(event.data.multiplier, event.data.timestamp);
-      } else if (event.data.type === 'BETAO_BATCH_ROUNDS' && Array.isArray(event.data.multipliers)) {
-        const batch: RoundData[] = [];
-        const now = Date.now();
-        event.data.multipliers.forEach((m: number, idx: number) => {
-          if (typeof m === 'number' && m >= 1.0) {
-            const fakeTime = now - (event.data.multipliers.length - idx) * 20 * 1000;
-            const d = new Date(fakeTime);
-            batch.push({
-              id: `betao-batch-${fakeTime}-${idx}`,
-              multiplier: Number(m.toFixed(2)),
-              timestamp: fakeTime,
-              minute: d.getMinutes(),
-              timeFormatted: formatTime(d),
-              tier: getMultiplierTier(m),
-              source: 'BETAO_LIVE',
-            });
+  const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
+  const [browserPermission, setBrowserPermission] = useState<NotificationPermission | 'unsupported'>('default');
+
+  const lastSignalIdRef = useRef<string>('');
+
+  // Save settings changes to localStorage
+  const handleUpdateSettings = (newSettings: NotificationSettings) => {
+    setNotificationSettings(newSettings);
+    localStorage.setItem('aviator_notif_settings', JSON.stringify(newSettings));
+  };
+
+  useEffect(() => {
+    localStorage.setItem('aviator_sound_enabled', String(soundEnabled));
+  }, [soundEnabled]);
+
+  // Check browser notification permission on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setBrowserPermission(Notification.permission);
+    } else {
+      setBrowserPermission('unsupported');
+    }
+  }, []);
+
+  // Fetch initial candles from server
+  useEffect(() => {
+    async function loadCandles() {
+      try {
+        const res = await fetch('/api/candles');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.candles)) {
+            setCandles(data.candles);
           }
+        }
+      } catch (e) {
+        console.warn('Usando candles locais de fallback:', e);
+      }
+    }
+    loadCandles();
+  }, []);
+
+  // Compute stats and active signal
+  const statistics = useMemo(() => calculateStatistics(candles), [candles]);
+  const currentSignal = useMemo(() => evaluateLiveSignal(candles), [candles]);
+  const payingMinutes = useMemo(() => analyzePayingMinutes(candles), [candles]);
+
+  // Dispatch API and Push Notifications
+  const dispatchSignalNotifications = async (signal: RadarSignal) => {
+    if (signal.type === 'STANDBY') return;
+
+    // Avoid duplicate dispatch for identical signal
+    if (lastSignalIdRef.current === signal.id) return;
+    lastSignalIdRef.current = signal.id;
+
+    // Play Sound
+    if (soundEnabled) {
+      if (signal.type === 'PINK_RADAR') {
+        playPinkAlertSound();
+      } else {
+        playPurpleAlertSound();
+      }
+    }
+
+    // Vibration on mobile
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(signal.type === 'PINK_RADAR' ? [200, 100, 200, 100, 300] : [150, 80, 150]);
+      } catch {
+        // Ignore
+      }
+    }
+
+    // 1. Browser Native Push Notification
+    if (
+      typeof window !== 'undefined' &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      try {
+        new Notification(signal.title, {
+          body: `Alvo: ${signal.targetMultiplier} | Confiança: ${signal.confidence}% | Minutagem: ${signal.payingMinuteTarget}`,
+          icon: '/public/pwa-192x192.png',
+          badge: '/public/favicon.ico',
         });
-        if (batch.length > 0) {
-          setIsLiveConnected(true);
-          setLiveRoundsCount((prev) => prev + batch.length);
-          setRounds((prev) => [...prev.slice(-(100 - batch.length)), ...batch]);
-        }
+
+        setNotificationLogs((prev) => [
+          {
+            id: `log-${Date.now()}-push`,
+            timestamp: Date.now(),
+            channel: 'browser',
+            status: 'sent',
+            title: signal.title,
+            message: `Alvo: ${signal.targetMultiplier}`,
+          },
+          ...prev,
+        ]);
+      } catch (e) {
+        console.warn('Falha no Web Push:', e);
       }
-    };
+    }
 
-    window.addEventListener('message', handleWindowMessage);
+    // 2. Telegram Bot API Dispatch
+    if (
+      notificationSettings.telegram.enabled &&
+      notificationSettings.telegram.botToken &&
+      notificationSettings.telegram.chatId
+    ) {
+      const isPink = signal.type === 'PINK_RADAR';
+      const shouldSend =
+        (isPink && notificationSettings.telegram.notifyOnPink) ||
+        (!isPink && notificationSettings.telegram.notifyOnPurple);
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'betao_last_round' && e.newValue) {
+      if (shouldSend && signal.confidence >= notificationSettings.telegram.minConfidence) {
+        const text = `
+${isPink ? '🚨 <b>ALERTA MÁXIMO: CICLO DE VELA ROSA (10X+)</b> 🚨' : '⚡ <b>SINAL CONFIRMADO: VELA ROXA (2.00x)</b> ⚡'}
+
+🎯 <b>Alvo Sugerido:</b> ${signal.targetMultiplier}
+📈 <b>Confiança do Radar:</b> ${signal.confidence}%
+⏰ <b>Minutagem Pagante:</b> ${signal.payingMinuteTarget}
+⏱️ <b>Segundo Exato da Entrada:</b> ${signal.payingSecondTarget || ':18s (Janela :12s a :25s)'}
+🛡️ <b>Proteção / Entrada:</b> ${signal.protectionGale}
+📊 <b>Análise:</b> ${signal.triggerReason}
+
+<i>Enviado instantaneamente por Aviator Radar PWA com precisão de segundos</i>
+        `.trim();
+
         try {
-          const parsed = JSON.parse(e.newValue);
-          if (parsed && typeof parsed.multiplier === 'number') {
-            processIncomingRound(parsed.multiplier, parsed.timestamp);
-          }
-        } catch (err) {}
-      }
-    };
-    window.addEventListener('storage', handleStorage);
+          const res = await fetch('/api/notify/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              botToken: notificationSettings.telegram.botToken,
+              chatId: notificationSettings.telegram.chatId,
+              message: text,
+            }),
+          });
+          const resData = await res.json();
 
-    let bc: BroadcastChannel | null = null;
+          setNotificationLogs((prev) => [
+            {
+              id: `log-${Date.now()}-tg`,
+              timestamp: Date.now(),
+              channel: 'telegram',
+              status: resData.success ? 'sent' : 'failed',
+              title: signal.title,
+              message: text,
+            },
+            ...prev,
+          ]);
+
+          setUnreadCount((c) => c + 1);
+        } catch (err) {
+          console.error('Telegram dispatch error:', err);
+        }
+      }
+    }
+
+    // 3. Webhook Dispatch
+    if (notificationSettings.webhook.enabled && notificationSettings.webhook.url) {
+      const isPink = signal.type === 'PINK_RADAR';
+      const shouldSend =
+        (isPink && notificationSettings.webhook.notifyOnPink) ||
+        (!isPink && notificationSettings.webhook.notifyOnPurple);
+
+      if (shouldSend) {
+        const payload = {
+          title: signal.title,
+          multiplier: signal.targetMultiplier,
+          confidence: signal.confidence,
+          payingMinute: signal.payingMinuteTarget,
+          payingSeconds: signal.payingSecondTarget || ':18s',
+          exactSecond: signal.targetSecond,
+          reason: signal.triggerReason,
+          protection: signal.protectionGale,
+          type: signal.type,
+          timestamp: new Date().toISOString(),
+        };
+
+        try {
+          const res = await fetch('/api/notify/webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: notificationSettings.webhook.url,
+              payload,
+            }),
+          });
+          const resData = await res.json();
+
+          setNotificationLogs((prev) => [
+            {
+              id: `log-${Date.now()}-wh`,
+              timestamp: Date.now(),
+              channel: 'webhook',
+              status: resData.success ? 'sent' : 'failed',
+              title: signal.title,
+              message: JSON.stringify(payload),
+            },
+            ...prev,
+          ]);
+
+          setUnreadCount((c) => c + 1);
+        } catch (err) {
+          console.error('Webhook error:', err);
+        }
+      }
+    }
+  };
+
+  // Check and dispatch signal when currentSignal changes
+  useEffect(() => {
+    if (currentSignal.type !== 'STANDBY') {
+      dispatchSignalNotifications(currentSignal);
+    }
+  }, [currentSignal.id]);
+
+  // Add Candle Handler
+  const handleAddCandle = async (multiplier: number, customTimestamp?: number) => {
+    playClickSound();
+    const candleTime = customTimestamp && customTimestamp > 0 ? customTimestamp : Date.now();
     try {
-      bc = new BroadcastChannel('betao_aviator_sync');
-      bc.onmessage = (event) => {
-        if (event.data?.type === 'BETAO_ROUND' && typeof event.data.multiplier === 'number') {
-          processIncomingRound(event.data.multiplier, event.data.timestamp);
+      const res = await fetch('/api/candles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ multiplier, timestamp: candleTime }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.candle) {
+          setCandles((prev) => [data.candle, ...prev]);
         }
+      } else {
+        // Local fallback
+        const dateObj = new Date(candleTime);
+        const color = getCandleColor(multiplier);
+        const newCandle: AviatorCandle = {
+          id: `local-${Date.now()}`,
+          multiplier: Number(multiplier.toFixed(2)),
+          timestamp: candleTime,
+          color,
+          roundNumber: candles.length + 1,
+          payingMinute: dateObj.getMinutes(),
+        };
+        setCandles((prev) => [newCandle, ...prev]);
+      }
+    } catch {
+      // Local fallback
+      const dateObj = new Date(candleTime);
+      const color = getCandleColor(multiplier);
+      const newCandle: AviatorCandle = {
+        id: `local-${Date.now()}`,
+        multiplier: Number(multiplier.toFixed(2)),
+        timestamp: candleTime,
+        color,
+        roundNumber: candles.length + 1,
+        payingMinute: dateObj.getMinutes(),
       };
-    } catch (e) {}
+      setCandles((prev) => [newCandle, ...prev]);
+    }
+  };
 
-    return () => {
-      window.removeEventListener('message', handleWindowMessage);
-      window.removeEventListener('storage', handleStorage);
-      if (bc) bc.close();
-    };
-  }, []);
-
-  // Desbloquear motor de áudio e fala no primeiro clique ou toque na tela
-  useEffect(() => {
-    const handleUnlock = () => {
-      soundEffects.unlock();
-      window.removeEventListener('click', handleUnlock);
-      window.removeEventListener('touchstart', handleUnlock);
-    };
-    window.addEventListener('click', handleUnlock);
-    window.addEventListener('touchstart', handleUnlock);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        notificationService.resetTabTitle();
+  // Reset Candles
+  const handleResetCandles = async () => {
+    try {
+      const res = await fetch('/api/candles/reset', { method: 'POST' });
+      if (res.ok) {
+        const candlesRes = await fetch('/api/candles');
+        const data = await candlesRes.json();
+        setCandles(data.candles || []);
       }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
+    } catch {
+      // ignore
+    }
+  };
 
-    return () => {
-      window.removeEventListener('click', handleUnlock);
-      window.removeEventListener('touchstart', handleUnlock);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, []);
+  // Toggle Simulation and persist preference
+  const handleToggleSimulation = (sim: boolean) => {
+    setIsSimulating(sim);
+    localStorage.setItem('aviator_is_simulating', String(sim));
+  };
 
-  // Relógio Atômico em Tempo Real via Web Worker Ticker (imune a congelamento em segundo plano)
-  useEffect(() => {
-    const ticker = new BackgroundTicker();
+  // Batch Synchronize Candles with official game table
+  const handleSyncBatch = async (
+    inputText: string,
+    replaceAll: boolean,
+    secondsPerRound: number,
+    newestFirst: boolean = true,
+    lastExitTimestamp?: number
+  ): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/candles/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          multipliers: inputText,
+          replaceAll,
+          secondsPerRound,
+          newestFirst,
+          lastExitTimestamp,
+        }),
+      });
 
-    ticker.start((timestamp) => {
-      const now = new Date(timestamp);
-      setCurrentDate(now);
-
-      const sec = now.getSeconds();
-      const currentMin = now.getMinutes();
-
-      // Alerta de Preparação no Betão (quando faltam 15 segundos para o minuto alvo)
-      if (activeSignal && activeSignal.targetMinute === (currentMin + 1) % 60 && sec === 45) {
-        const prepareKey = `${activeSignal.id}-prepare-${activeSignal.targetMinute}`;
-        if (hasSpokenPrepareRef.current !== prepareKey) {
-          hasSpokenPrepareRef.current = prepareKey;
-          soundEffects.playPrepareWarning();
-          soundEffects.speakVoice(
-            `Atenção! Faltam 15 segundos para o minuto ${activeSignal.targetMinuteFormatted} no Betão. Prepare a aposta!`
-          );
-          notificationService.notifyPrepare(activeSignal.targetMinuteFormatted, 15);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.candles)) {
+          setCandles(data.candles);
+          return true;
         }
       }
+      return false;
+    } catch (err) {
+      console.error('Batch sync error:', err);
+      return false;
+    }
+  };
 
-      // Alerta de Entrada Ativa no Betão (no segundo :00 do minuto alvo)
-      if (activeSignal && activeSignal.targetMinute === currentMin && sec === 0) {
-        const enterKey = `${activeSignal.id}-enter-${activeSignal.targetMinute}`;
-        if (hasSpokenEnterRef.current !== enterKey) {
-          hasSpokenEnterRef.current = enterKey;
-          soundEffects.playSignalAlert();
-          soundEffects.speakVoice(
-            `Entrada confirmada agora no Betão! Minuto ${activeSignal.targetMinuteFormatted}. Saída de segurança em ${activeSignal.recommendedSafeExit.toFixed(2)}x!`
-          );
-          notificationService.notifyEnter(
-            activeSignal.targetMinuteFormatted,
-            activeSignal.recommendedSafeExit,
-            activeSignal.probability
-          );
+  // Remove the last added candle
+  const handleRemoveLastCandle = async () => {
+    playClickSound();
+    try {
+      const res = await fetch('/api/candles/last', { method: 'DELETE' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.candles)) {
+          setCandles(data.candles);
+          return;
         }
       }
+      setCandles((prev) => prev.slice(1));
+    } catch {
+      setCandles((prev) => prev.slice(1));
+    }
+  };
 
-      // Tick sonoro nos últimos 3 segundos antes da virada do minuto
-      if (sec >= 57 && sec !== prevSecondRef.current) {
-        prevSecondRef.current = sec;
-        soundEffects.playTick();
-      }
-    });
-
-    return () => {
-      ticker.stop();
-    };
-  }, [activeSignal]);
-
-  // Atualização suave de rodadas em segundo plano simulando o fluxo da mesa do Betão
+  // Simulated live round ticker
   useEffect(() => {
-    if (!isAutoFeed) return;
+    if (!isSimulating) return;
 
-    const interval = window.setInterval(() => {
-      const now = new Date();
-      const currentMin = now.getMinutes();
-      const isTargetMin = activeSignal && (activeSignal.targetMinute === currentMin || activeSignal.targetMinute === (currentMin + 1) % 60);
-      const multiplier = isTargetMin
-        ? generateCalibratedMultiplierForSignal(activeSignal)
-        : generateRealisticMultiplier();
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          // Generate new realistic round according to Aviator odds
+          const rand = Math.random();
+          let mult = 1.0;
+          if (rand < 0.08) {
+            // Pink candle (10x - 45x)
+            mult = Number((10.0 + Math.random() * 32.0).toFixed(2));
+          } else if (rand < 0.44) {
+            // Purple candle (2.0x - 8.5x)
+            mult = Number((2.0 + Math.random() * 5.5).toFixed(2));
+          } else {
+            // Blue candle (1.00x - 1.98x)
+            mult = Number((1.01 + Math.random() * 0.95).toFixed(2));
+          }
 
-      const newRound: RoundData = {
-        id: `auto-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        multiplier,
-        timestamp: now.getTime(),
-        timeFormatted: formatTime(now),
-        minute: now.getMinutes(),
-        tier: getMultiplierTier(multiplier),
-      };
-      setRounds((prev) => [...prev.slice(-99), newRound]);
-    }, 14000);
+          handleAddCandle(mult);
+          return Math.floor(18 + Math.random() * 8); // Reset countdown to 18-26 seconds
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [isAutoFeed, activeSignal]);
+  }, [isSimulating, candles.length]);
 
-  // Recalcular gatilhos com base no modo selecionado e rodadas
-  useEffect(() => {
-    const signal = analyzeTriggers(rounds, currentDate, confidenceMode);
-    setActiveSignal(signal);
-
-    // Se um novo sinal foi detectado e for diferente do anterior, tocar alerta sonoro e falar
-    if (signal && signal.id !== prevSignalIdRef.current) {
-      prevSignalIdRef.current = signal.id;
-      soundEffects.playSignalAlert();
-      soundEffects.speakVoice(
-        `Novo gatilho Betão detectado: Minuto ${signal.targetMinuteFormatted}. Alvo: ${signal.expectedTier === 'pink' ? 'Vela Rosa 10x+' : 'Vela Roxa'}. Saída Segura em ${signal.recommendedSafeExit.toFixed(2)}x!`
-      );
-      notificationService.sendNotification({
-        title: `🎯 NOVO GATILHO BETÃO: Minuto ${signal.targetMinuteFormatted}`,
-        body: `Alvo: ${signal.expectedTierLabel}. Saída Segura: ${signal.recommendedSafeExit.toFixed(2)}x. Probabilidade: ${signal.probability}%.`,
-        tag: 'betao-new-signal',
-      });
-
-      // Adicionar à lista de sinais se não existir
-      setSignalsHistory((prev) => {
-        if (prev.some((s) => s.id === signal.id)) return prev;
-        return [...prev, signal];
-      });
-    }
-  }, [rounds, currentDate.getMinutes(), confidenceMode]);
-
-  // Manipulador para nova rodada finalizada
-  const handleNewRound = (newRound: RoundData) => {
-    setRounds((prev) => [...prev.slice(-99), newRound]);
-
-    // Verificar se a nova rodada bateu a meta de algum sinal ativo
-    if (activeSignal && activeSignal.targetMinute === newRound.minute) {
-      const isGreen = newRound.multiplier >= activeSignal.recommendedSafeExit;
-      if (isGreen) {
-        soundEffects.playGreenCelebration();
-        if (newRound.multiplier >= 10.00) {
-          soundEffects.speakVoice(
-            `Vela Rosa confirmada no Betão! ${newRound.multiplier.toFixed(2)}x!`
-          );
-        } else {
-          soundEffects.speakVoice(
-            `Vela Roxa confirmada no Betão! ${newRound.multiplier.toFixed(2)}x!`
-          );
-        }
-        notificationService.notifyGreen(newRound.multiplier);
-        confetti({
-          particleCount: 90,
-          spread: 75,
-          origin: { y: 0.6 },
-          colors: ['#10B981', '#F43F5E', '#A855F7', '#F59E0B'],
-        });
+  // Request native browser permissions
+  const handleRequestBrowserPermissions = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const perm = await Notification.requestPermission();
+        setBrowserPermission(perm);
+        return perm === 'granted';
+      } catch {
+        return false;
       }
+    }
+    return false;
+  };
 
-      setSignalsHistory((prev) =>
-        prev.map((s) => {
-          if (s.id === activeSignal.id && s.status !== 'GREEN' && s.status !== 'RED') {
-            return {
-              ...s,
-              status: isGreen ? 'GREEN' : 'RED',
-              resultMultiplier: newRound.multiplier,
-              resultTier: newRound.tier,
-            };
-          }
-          return s;
-        })
-      );
+  // Telegram test helper
+  const handleTestTelegram = async (botToken: string, chatId: string) => {
+    try {
+      const res = await fetch('/api/notify/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: 'telegram', botToken, chatId }),
+      });
+      return await res.json();
+    } catch (e: unknown) {
+      return { success: false, error: e instanceof Error ? e.message : 'Falha na conexão' };
     }
   };
 
-  // Importação em lote de velas reais do Betão
-  const handleBatchAddRounds = (newRounds: RoundData[]) => {
-    setRounds((prev) => [...prev.slice(-(100 - newRounds.length)), ...newRounds]);
-    soundEffects.playBeep(800, 0.15, 'triangle');
-  };
-
-  const handleAddSingleRound = (multiplier: number, source?: 'BETAO_LIVE' | 'BETAO_SYNC') => {
-    const now = new Date();
-    const newRound: RoundData = {
-      id: `round-manual-${now.getTime()}`,
-      multiplier,
-      timestamp: now.getTime(),
-      minute: now.getMinutes(),
-      timeFormatted: formatTime(now),
-      tier: getMultiplierTier(multiplier),
-      source: source || 'BETAO_LIVE',
-    };
-    handleNewRound(newRound);
-  };
-
-  // Substituir todo o histórico com as velas exatas do site CloudFront
-  const handleReplaceRounds = (newRounds: RoundData[]) => {
-    if (newRounds.length === 0) return;
-    setRounds(newRounds);
-    setLiveRoundsCount((prev) => prev + newRounds.length);
-    setIsLiveConnected(true);
-    const last = newRounds[newRounds.length - 1];
-    if (last) {
-      setLastLiveRoundTime(last.timeFormatted);
+  // Webhook test helper
+  const handleTestWebhook = async (webhookUrl: string) => {
+    try {
+      const res = await fetch('/api/notify/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: 'webhook', webhookUrl }),
+      });
+      return await res.json();
+    } catch (e: unknown) {
+      return { success: false, error: e instanceof Error ? e.message : 'Falha na conexão' };
     }
-    soundEffects.playBeep(920, 0.15, 'sine');
   };
 
-  // Validar Green manualmente
-  const handleConfirmGreen = (signalId: string) => {
-    soundEffects.playGreenCelebration();
-    soundEffects.speakVoice('Green validado com sucesso!');
-    notificationService.sendNotification({
-      title: '🎉 GREEN VALIDADO NO BETÃO!',
-      body: 'Gatilho confirmado e computado no seu histórico de acertos.',
-      tag: 'betao-manual-green',
-    });
-    confetti({
-      particleCount: 110,
-      spread: 80,
-      origin: { y: 0.5 },
-      colors: ['#10B981', '#06B6D4', '#E11D48', '#F59E0B'],
-    });
+  // Instant notification trigger from Surgical Tracker
+  const handleSendInstantAlert = async (title: string, message: string) => {
+    // 1. Browser push
+    if (
+      typeof window !== 'undefined' &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      try {
+        new Notification(title, {
+          body: message,
+          icon: '/icon.svg',
+        });
+      } catch {
+        // Ignore
+      }
+    }
 
-    setSignalsHistory((prev) =>
-      prev.map((s) => {
-        if (s.id === signalId) {
-          const fallbackMult = s.expectedTier === 'pink' ? 14.80 : 2.50;
-          return {
-            ...s,
-            status: 'GREEN',
-            resultMultiplier: s.resultMultiplier || fallbackMult,
-            resultTier: s.expectedTier,
-          };
-        }
-        return s;
-      })
-    );
+    // 2. Telegram
+    if (
+      notificationSettings.telegram.enabled &&
+      notificationSettings.telegram.botToken &&
+      notificationSettings.telegram.chatId
+    ) {
+      try {
+        const text = `🚨 <b>${title}</b>\n\n${message}\n\n<i>Aviator Radar Cirúrgico PWA</i>`;
+        const res = await fetch('/api/notify/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            botToken: notificationSettings.telegram.botToken,
+            chatId: notificationSettings.telegram.chatId,
+            message: text,
+          }),
+        });
+        const d = await res.json();
+        setNotificationLogs((prev) => [
+          {
+            id: `log-${Date.now()}-tg`,
+            timestamp: Date.now(),
+            channel: 'telegram',
+            status: d.success ? 'sent' : 'failed',
+            title,
+            message,
+          },
+          ...prev,
+        ]);
+      } catch (err) {
+        console.error('Telegram dispatch error:', err);
+      }
+    }
+
+    // 3. Webhook
+    if (notificationSettings.webhook.enabled && notificationSettings.webhook.url) {
+      try {
+        const res = await fetch('/api/notify/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: notificationSettings.webhook.url,
+            payload: { title, message, timestamp: Date.now() },
+          }),
+        });
+        const d = await res.json();
+        setNotificationLogs((prev) => [
+          {
+            id: `log-${Date.now()}-wh`,
+            timestamp: Date.now(),
+            channel: 'webhook',
+            status: d.success ? 'sent' : 'failed',
+            title,
+            message,
+          },
+          ...prev,
+        ]);
+      } catch (err) {
+        console.error('Webhook error:', err);
+      }
+    }
+
+    setUnreadCount((c) => c + 1);
   };
-
-  const handleToggleAudio = () => {
-    const updated = soundEffects.toggleSound();
-    setIsAudioEnabled(updated);
-  };
-
-  const currentMinute = currentDate.getMinutes();
-  const currentSecond = currentDate.getSeconds();
-  const currentTimeFormatted = formatTime(currentDate);
-
-  const tableClimate = calculateTableClimate(rounds);
-
-  const heatmapData = calculateMinuteHeatmap(
-    rounds,
-    currentMinute,
-    activeSignal?.targetMinute
-  );
-
-  const hourlyPayoutData = calculateHourlyPayoutMap(rounds, currentDate);
-
-  const stats = calculateGlobalStats(rounds, signalsHistory);
 
   return (
-    <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white pb-12">
-      {/* Top Header */}
-      <Header
-        currentTime={currentTimeFormatted}
-        isAudioEnabled={isAudioEnabled}
-        onToggleAudio={handleToggleAudio}
-        winRate={stats.winRate}
-        currentStreak={stats.currentStreak}
-        onOpenBetaoBridge={() => setIsBridgeModalOpen(true)}
-        isLiveConnected={isLiveConnected}
-        onToggleLiveFrame={() => setShowLiveFrame((prev) => !prev)}
-        isLiveFrameOpen={showLiveFrame}
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col selection:bg-pink-500 selection:text-white">
+      {/* Top Navigation */}
+      <Navbar
+        soundEnabled={soundEnabled}
+        setSoundEnabled={setSoundEnabled}
+        unreadNotificationsCount={unreadCount}
+        isSimulating={isSimulating}
+        setIsSimulating={handleToggleSimulation}
+        onOpenSyncModal={() => setIsSyncModalOpen(true)}
+        onOpenNotificationsModal={() => {
+          setIsNotificationsModalOpen(true);
+          setUnreadCount(0);
+        }}
       />
 
-      {/* Aviator Horizontal Multipliers Bar */}
-      <RoundsHistoryBar
-        rounds={rounds}
-        onOpenManualModal={() => setIsManualModalOpen(true)}
-      />
-
-      {/* Main Content Dashboard */}
-      <main className="mx-auto w-full max-w-7xl px-3 sm:px-6 pt-3 sm:pt-5 space-y-4 sm:space-y-5 flex-1">
-        {/* Banner de Notificações em Segundo Plano & Desbloqueio de Voz */}
-        <VoiceNotificationBanner onUnlockAudio={() => soundEffects.unlock()} />
-
-        {/* Indicador de Conexão com a Mesa Oficial CloudFront */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs shadow-inner">
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isLiveConnected
-                  ? 'bg-emerald-400 shadow-md shadow-emerald-500/50 animate-pulse'
-                  : 'bg-rose-500 animate-pulse'
-              }`}
-            />
-            <div className="flex flex-wrap items-center gap-1.5 text-slate-300">
-              <span className="font-bold text-white">Mesa Oficial (CloudFront):</span>
-              <a
-                href={OFFICIAL_BETAO_CLOUDFRONT_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="text-rose-400 hover:text-rose-300 font-mono underline flex items-center gap-0.5 text-[11px]"
-              >
-                d18ets18cyzpod.cloudfront.net (id=483312306)
-              </a>
-              <span className="text-[11px] text-slate-400 hidden md:inline">
-                {isLiveConnected
-                  ? `• Conectado ao vivo (${liveRoundsCount} velas recebidas)`
-                  : '• Siga as velas exatas desta mesa'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowLiveFrame((prev) => !prev)}
-              className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition flex items-center gap-1 ${
-                showLiveFrame
-                  ? 'bg-amber-950/40 border-amber-500/50 text-amber-300'
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
-              }`}
-            >
-              <span>{showLiveFrame ? 'Ocultar Mesa' : '📺 Exibir Mesa Ao Vivo'}</span>
-            </button>
-            <button
-              id="open-sync-bridge-btn"
-              onClick={() => setIsBridgeModalOpen(true)}
-              className="px-2.5 py-1 rounded-lg bg-rose-600/20 border border-rose-500/40 text-rose-300 hover:bg-rose-600/30 text-xs font-bold transition flex items-center gap-1"
-            >
-              <span>{isLiveConnected ? 'Sincronizado' : 'Sincronizar'}</span>
-            </button>
-            <button
-              onClick={() => setIsAutoFeed((prev) => !prev)}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition ${
-                !isAutoFeed
-                  ? 'border-emerald-500/40 bg-emerald-950/40 text-emerald-300'
-                  : 'border-amber-500/40 bg-amber-950/40 text-amber-300'
-              }`}
-              title={
-                !isAutoFeed
-                  ? 'Modo Mesa Real Ativo: somente velas que saem na mesa informada'
-                  : 'Modo Treino: gerando velas simuladas'
-              }
-            >
-              {!isAutoFeed ? 'Modo: Mesa Real' : 'Modo: Treino'}
-            </button>
-          </div>
-        </div>
-
-        {/* Visualizador da Mesa Oficial Embutida e Fast Capture */}
-        <BetaoLiveFrame
-          isOpen={showLiveFrame}
-          onToggleOpen={() => setShowLiveFrame((prev) => !prev)}
-          onAddRound={handleNewRound}
-          onReplaceRounds={handleReplaceRounds}
-          isLiveConnected={isLiveConnected}
-          liveRoundsCount={liveRoundsCount}
-          lastLiveRoundTime={lastLiveRoundTime}
+      {/* Main Single-Screen Canvas: Focused Signal Monitor */}
+      <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-3 sm:px-6 sm:py-5">
+        <FocusedSignalMonitor
+          candles={candles}
+          statistics={statistics}
+          currentSignal={currentSignal}
+          onAddCandle={handleAddCandle}
+          onRemoveLastCandle={handleRemoveLastCandle}
+          onOpenSyncModal={() => setIsSyncModalOpen(true)}
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          notificationSettings={notificationSettings}
+          onSendInstantAlert={handleSendInstantAlert}
         />
-
-        {/* Barra de Sincronia Instantânea com a Mesa do Betão */}
-        <BetaoSyncBar
-          climate={tableClimate}
-          onAddRound={handleNewRound}
-          onBatchAddRounds={handleBatchAddRounds}
-          onReplaceRounds={handleReplaceRounds}
-          onSyncClock={() => setCurrentDate(new Date())}
-          onOpenBetaoBridge={() => setIsBridgeModalOpen(true)}
-          onToggleLiveFrame={() => setShowLiveFrame((prev) => !prev)}
-          isLiveFrameOpen={showLiveFrame}
-          isLiveConnected={isLiveConnected}
-          feedMode={isAutoFeed ? 'SIMULATION' : 'REAL_BETAO'}
-          onToggleFeedMode={() => setIsAutoFeed((prev) => !prev)}
-        />
-
-        {/* Seletor de Modo de Probabilidade (Sniper 98% / Moderado / Rosa) */}
-        <ModeSelector
-          currentMode={confidenceMode}
-          onSelectMode={(mode) => setConfidenceMode(mode)}
-        />
-
-        {/* Banner de Status & Guia */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-2xl bg-gradient-to-r from-rose-950/40 via-slate-900/60 to-purple-950/40 border border-rose-500/20 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-orange-400 animate-ping" />
-            <span className="text-slate-300">
-              Gatilhos conectados aos minutos <strong className="text-orange-400 font-extrabold">do Betão</strong>. <strong className="text-white">Minuto Atual: :{String(currentMinute).padStart(2, '0')}</strong>
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              id="open-strategy-guide-button"
-              onClick={() => setIsGuideModalOpen(true)}
-              className="flex items-center gap-1 text-rose-400 hover:text-rose-300 font-semibold underline underline-offset-4"
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span>Como funcionam os minutos?</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Top Operational Section: Active Signal (Foco Total no Gatilho Ativo) */}
-        <div className="w-full">
-          <ActiveSignalCard
-            signal={activeSignal}
-            currentMinute={currentMinute}
-            currentSecond={currentSecond}
-            onConfirmGreen={handleConfirmGreen}
-          />
-        </div>
-
-        {/* Mapeamento de Melhores Horários de Pagamento (Roxas e Rosas) */}
-        <BestPayoutHoursMap
-          hourlyData={hourlyPayoutData}
-          currentMinute={currentMinute}
-        />
-
-        {/* 60-Minute Heatmap Grid */}
-        <MinuteHeatmap
-          heatmapData={heatmapData}
-          currentMinute={currentMinute}
-          targetMinute={activeSignal?.targetMinute}
-        />
-
-        {/* Bottom Section: Signals History + Dual-Bet Bankroll Calculator */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Signals History Feed */}
-          <div className="lg:col-span-7">
-            <SignalsHistory
-              signals={signalsHistory}
-              winRate={stats.winRate}
-              totalGreens={stats.totalGreens}
-              totalReds={stats.totalReds}
-            />
-          </div>
-
-          {/* Betão Dual Bet & Bankroll Strategy */}
-          <div className="lg:col-span-5">
-            <BankrollCalculator />
-          </div>
-        </div>
       </main>
 
-      {/* Modals & Offline Indicator */}
-      <BetaoLiveBridgeModal
-        isOpen={isBridgeModalOpen}
-        onClose={() => setIsBridgeModalOpen(false)}
-        onBatchAddRounds={handleBatchAddRounds}
-        onReplaceRounds={handleReplaceRounds}
-        onAddSingleRound={(mult, src) => handleAddSingleRound(mult, src)}
-        isLiveConnected={isLiveConnected}
-        liveRoundsCount={liveRoundsCount}
-        lastLiveRoundTime={lastLiveRoundTime}
+      {/* Notification Settings Modal */}
+      <NotificationSettingsModal
+        isOpen={isNotificationsModalOpen}
+        onClose={() => setIsNotificationsModalOpen(false)}
+        settings={notificationSettings}
+        onUpdateSettings={handleUpdateSettings}
+        logs={notificationLogs}
+        onTestTelegram={handleTestTelegram}
+        onTestWebhook={handleTestWebhook}
+        onRequestBrowserPermissions={handleRequestBrowserPermissions}
+        browserPermission={browserPermission}
       />
 
-      <ManualEntryModal
-        isOpen={isManualModalOpen}
-        onClose={() => setIsManualModalOpen(false)}
-        onAddRound={handleNewRound}
+      {/* Table Synchronizer Modal */}
+      <TableSynchronizerModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        onSyncBatch={handleSyncBatch}
+        currentCandlesCount={candles.length}
       />
 
-      <StrategyGuideModal
-        isOpen={isGuideModalOpen}
-        onClose={() => setIsGuideModalOpen(false)}
-      />
-
+      {/* PWA Offline Indicator */}
       <OfflineIndicator />
-
-      {/* Subtle Footer */}
-      <footer className="mt-8 border-t border-slate-900 px-4 py-4 text-center text-[11px] text-slate-500">
-        <p>Gatilhos de Minutos Aviator no Betão PWA • Sistema probabilístico analítico em tempo real • Jogue com responsabilidade</p>
-      </footer>
     </div>
   );
 }

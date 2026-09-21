@@ -1,34 +1,26 @@
 import React, { useState } from 'react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { Download, Smartphone, X, Share, PlusSquare, CheckCircle2 } from 'lucide-react';
+import { Download, Share2, Smartphone, X } from 'lucide-react';
 
 export const PWAInstallButton: React.FC = () => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
-  // If already installed
+  // If already running as an installed PWA, hide the button
   if (isInstalled) {
-    return (
-      <div
-        id="pwa-installed-badge"
-        className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold"
-      >
-        <CheckCircle2 className="w-3.5 h-3.5" />
-        <span>PWA Instalado</span>
-      </div>
-    );
+    return null;
   }
 
   // Chromium / Android / Desktop flow
   if (isInstallable) {
     return (
       <button
-        id="pwa-install-button"
+        id="btn-install-pwa"
         onClick={install}
-        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white px-3.5 py-1.5 text-xs font-bold shadow-lg shadow-rose-600/30 transition active:scale-95 border border-rose-400/40"
+        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-3.5 py-2 text-xs md:text-sm font-semibold text-white shadow-lg shadow-pink-600/30 hover:from-pink-500 hover:to-purple-500 transition-all active:scale-95"
       >
         <Download className="w-4 h-4" />
-        <span>Instalar App</span>
+        <span>Instalar App PWA</span>
       </button>
     );
   }
@@ -38,64 +30,60 @@ export const PWAInstallButton: React.FC = () => {
     return (
       <>
         <button
-          id="pwa-ios-guide-button"
+          id="btn-install-ios"
           onClick={() => setShowIOSGuide(true)}
-          className="flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition"
+          className="flex items-center gap-1.5 rounded-xl border border-purple-500/40 bg-purple-950/40 px-3 py-1.5 text-xs font-semibold text-purple-200 hover:bg-purple-900/50 transition-all"
         >
-          <Smartphone className="w-3.5 h-3.5" />
+          <Smartphone className="w-3.5 h-3.5 text-pink-400" />
           <span>Instalar no iPhone</span>
         </button>
 
         {showIOSGuide && (
-          <div
-            id="ios-install-modal"
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-          >
-            <div className="w-full max-w-sm rounded-2xl bg-[#0F172A] border border-rose-500/30 p-5 shadow-2xl text-slate-100">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl">
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center text-rose-400">
-                    <Smartphone className="w-4 h-4" />
-                  </div>
-                  <h3 className="text-base font-bold text-white">Instalar no iOS</h3>
-                </div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Smartphone className="w-5 h-5 text-pink-500" />
+                  Instalar no iOS (Safari)
+                </h3>
                 <button
-                  id="close-ios-modal-button"
                   onClick={() => setShowIOSGuide(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
-              <div className="mt-4 space-y-3.5 text-xs text-slate-300">
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 shrink-0">
-                    <Share className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-white">1. Toque em Compartilhar</span>
-                    <p className="text-slate-400 text-[11px] mt-0.5">Na barra inferior do seu navegador Safari do iPhone.</p>
-                  </div>
+              <div className="mt-4 space-y-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-pink-500/20 text-xs font-bold text-pink-400">
+                    1
+                  </span>
+                  <p>
+                    Toque no botão <strong className="text-white flex items-center gap-1 inline-flex"><Share2 className="w-3.5 h-3.5 text-blue-400" /> Compartilhar</strong> na barra do Safari.
+                  </p>
                 </div>
-
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <div className="p-1.5 rounded-lg bg-rose-500/20 text-rose-400 shrink-0">
-                    <PlusSquare className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-white">2. Adicionar à Tela de Início</span>
-                    <p className="text-slate-400 text-[11px] mt-0.5">Role a lista para baixo e selecione &quot;Adicionar à Tela de Início&quot;.</p>
-                  </div>
+                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs font-bold text-purple-400">
+                    2
+                  </span>
+                  <p>
+                    Role para baixo e selecione <strong className="text-white">Adicionar à Tela de Início</strong>.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-xs font-bold text-emerald-400">
+                    3
+                  </span>
+                  <p>
+                    Toque em <strong className="text-emerald-400">Adicionar</strong> no canto superior direito para rodar em tela cheia como aplicativo nativo.
+                  </p>
                 </div>
               </div>
-
               <button
-                id="ios-guide-dismiss-button"
                 onClick={() => setShowIOSGuide(false)}
-                className="mt-5 w-full rounded-xl bg-rose-600 py-2 text-xs font-bold text-white hover:bg-rose-500 transition"
+                className="mt-5 w-full rounded-xl bg-slate-800 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700 transition"
               >
-                Entendi, fechar
+                Entendido
               </button>
             </div>
           </div>
@@ -104,16 +92,18 @@ export const PWAInstallButton: React.FC = () => {
     );
   }
 
-  // Fallback desktop generic install guide button
   return (
     <button
-      id="pwa-generic-install-button"
+      id="btn-install-shortcut"
       onClick={() => {
-        alert("Para instalar este app PWA: no Chrome ou Edge clique no ícone de instalar (computador/seta para baixo) na barra de endereços!");
+        alert(
+          'Para instalar este PWA: clique nos 3 pontinhos do seu navegador (ou ícone de instalação na barra de endereço) e selecione "Instalar aplicativo"!'
+        );
       }}
-      className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:border-slate-600 transition"
+      className="flex items-center gap-1.5 rounded-xl border border-pink-500/30 bg-pink-950/20 px-3 py-1.5 text-xs font-medium text-pink-300 hover:bg-pink-950/40 transition"
+      title="Instalar aplicativo PWA"
     >
-      <Download className="w-3.5 h-3.5 text-rose-400" />
+      <Download className="w-3.5 h-3.5" />
       <span>Instalar PWA</span>
     </button>
   );
