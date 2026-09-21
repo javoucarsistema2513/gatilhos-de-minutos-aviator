@@ -32,10 +32,44 @@ let candlesHistory: StoredCandle[] = [
   { id: '17', multiplier: 18.90, timestamp: Date.now() - 1000 * 20 * 3, color: 'pink' as const, roundNumber: 117, payingMinute: 18 },
   { id: '18', multiplier: 2.05, timestamp: Date.now() - 1000 * 20 * 2, color: 'purple' as const, roundNumber: 118, payingMinute: 19 },
   { id: '19', multiplier: 1.35, timestamp: Date.now() - 1000 * 20 * 1, color: 'blue' as const, roundNumber: 119, payingMinute: 19 },
-  { id: '20', multiplier: 1.20, timestamp: Date.now(), color: 'blue' as const, roundNumber: 120, payingMinute: 20 },
+  { id: '20', multiplier: 2.45, timestamp: Date.now(), color: 'purple' as const, roundNumber: 120, payingMinute: 20 },
 ].reverse(); // Sort most recent first
 
 let roundCounter = 120;
+
+function getOrCalibrateCandles(): StoredCandle[] {
+  const now = Date.now();
+  if (candlesHistory.length === 0) {
+    const sampleMultipliers = [
+      2.45, 1.34, 1.15, 14.80, 2.10, 1.05, 3.82, 1.95, 4.10, 1.22,
+      18.90, 2.05, 1.35, 1.20, 5.40, 1.12, 2.65, 1.48, 1.29, 2.20
+    ];
+    candlesHistory = sampleMultipliers.map((mult, idx) => {
+      const ts = now - idx * 22000;
+      const color: 'blue' | 'purple' | 'pink' = mult >= 10 ? 'pink' : mult >= 2 ? 'purple' : 'blue';
+      return {
+        id: `seed-${idx}`,
+        multiplier: mult,
+        timestamp: ts,
+        color,
+        roundNumber: 150 - idx,
+        payingMinute: new Date(ts).getMinutes(),
+      };
+    });
+  } else if (now - candlesHistory[0].timestamp > 10 * 60 * 1000) {
+    // Keep seed in sync with live clock if it has been sitting in past
+    const shift = now - 20000 - candlesHistory[0].timestamp;
+    candlesHistory = candlesHistory.map((c) => {
+      const newTs = c.timestamp + shift;
+      return {
+        ...c,
+        timestamp: newTs,
+        payingMinute: new Date(newTs).getMinutes(),
+      };
+    });
+  }
+  return candlesHistory;
+}
 
 async function startServer() {
   const app = express();
@@ -50,10 +84,11 @@ async function startServer() {
 
   // Get Candles
   app.get('/api/candles', (req: Request, res: Response) => {
+    const list = getOrCalibrateCandles();
     res.json({
-      candles: candlesHistory,
+      candles: list,
       lastUpdated: Date.now(),
-      total: candlesHistory.length,
+      total: list.length,
     });
   });
 

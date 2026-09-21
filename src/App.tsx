@@ -24,9 +24,41 @@ import {
 } from './utils/calculator';
 import { playClickSound, playPinkAlertSound, playPurpleAlertSound } from './utils/audio';
 
+const generateInitialCandles = (): AviatorCandle[] => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('aviator_saved_candles');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const now = Date.now();
+  const sampleMultipliers = [
+    2.45, 1.34, 1.15, 14.80, 2.10, 1.05, 3.82, 1.95, 4.10, 1.22,
+    18.90, 2.05, 1.35, 1.20, 5.40, 1.12, 2.65, 1.48, 1.29, 2.20
+  ];
+  return sampleMultipliers.map((mult, idx) => {
+    const ts = now - idx * 22000;
+    const color: CandleColor = mult >= 10 ? 'pink' : mult >= 2 ? 'purple' : 'blue';
+    return {
+      id: `seed-${idx}`,
+      multiplier: mult,
+      timestamp: ts,
+      color,
+      roundNumber: 200 - idx,
+      payingMinute: new Date(ts).getMinutes(),
+    };
+  });
+};
+
 export default function App() {
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState<boolean>(false);
-  const [candles, setCandles] = useState<AviatorCandle[]>([]);
+  const [candles, setCandles] = useState<AviatorCandle[]>(generateInitialCandles);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     return localStorage.getItem('aviator_sound_enabled') !== 'false';
   });
@@ -102,8 +134,9 @@ export default function App() {
         const res = await fetch('/api/candles');
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.candles)) {
+          if (Array.isArray(data.candles) && data.candles.length > 0) {
             setCandles(data.candles);
+            localStorage.setItem('aviator_saved_candles', JSON.stringify(data.candles));
           }
         }
       } catch (e) {
