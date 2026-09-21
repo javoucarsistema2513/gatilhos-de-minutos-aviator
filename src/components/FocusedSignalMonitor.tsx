@@ -472,12 +472,12 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3.5 sm:space-y-4">
       {/* Top Streamlined Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-3.5 backdrop-blur-md">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-2.5 sm:p-3.5 backdrop-blur-md">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <div
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold text-white shadow-lg ${
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl font-bold text-white shadow-lg ${
               isPinkUpcoming
                 ? 'bg-gradient-to-br from-pink-600 to-rose-600 shadow-pink-600/30'
                 : 'bg-gradient-to-br from-purple-600 to-indigo-600 shadow-purple-600/30'
@@ -485,17 +485,17 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
           >
             {isPinkUpcoming ? <Flame className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-white tracking-tight">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
                 MONITORAMENTO CIRÚRGICO
               </h1>
-              <span className="rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-black uppercase flex items-center gap-1">
+              <span className="rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black uppercase flex items-center gap-1 shrink-0">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                 Ao Vivo
               </span>
             </div>
-            <p className="text-xs text-slate-400 flex items-center gap-2">
+            <p className="text-[11px] sm:text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
               <span>
                 Horário: <strong className="text-white font-mono">{timeFormatted}</strong>
               </span>
@@ -506,12 +506,12 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap">
           {/* Synchronize Real Table */}
           <button
             id="btn-sync-table-main"
             onClick={onOpenSyncModal}
-            className="flex items-center gap-1.5 rounded-xl border border-pink-500/60 bg-gradient-to-r from-pink-600 to-purple-600 px-3.5 py-2 text-xs font-black text-white shadow-lg shadow-pink-600/30 hover:brightness-110 transition active:scale-95"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl border border-pink-500/60 bg-gradient-to-r from-pink-600 to-purple-600 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-black text-white shadow-md shadow-pink-600/30 hover:brightness-110 transition active:scale-95 shrink-0"
             title="Sincronizar sequência real de velas da mesa"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -522,7 +522,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
           <button
             id="btn-toggle-game-view"
             onClick={() => setShowGame(!showGame)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 sm:py-2 text-xs font-bold transition shrink-0 ${
               showGame
                 ? 'border-purple-500/60 bg-purple-950/50 text-purple-300'
                 : 'border-slate-700 bg-slate-800 text-slate-300 hover:text-white'
@@ -536,7 +536,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
           {/* Sound Toggle */}
           <button
             onClick={onToggleSound}
-            className={`rounded-xl border p-2 text-xs transition ${
+            className={`rounded-xl border p-1.5 sm:p-2 text-xs transition shrink-0 ${
               soundEnabled
                 ? 'border-slate-700 bg-slate-800 text-emerald-400'
                 : 'border-slate-800 bg-slate-900 text-slate-500'
@@ -549,21 +549,21 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
       </div>
 
       {/* Top Segmented Mode Switcher (Aviator vs Slots Assertivos vs Radar Geral) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl overflow-hidden">
+        <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar pb-0.5 sm:pb-0 w-full">
           <button
             onClick={() => {
               setActiveRadarMode('AVIATOR');
               localStorage.setItem('aviator_radar_mode', 'AVIATOR');
             }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition shrink-0 ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black transition shrink-0 ${
               activeRadarMode === 'AVIATOR'
-                ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-600/30'
+                ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md shadow-pink-600/30'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
             <span>✈️</span>
-            <span>Radar Aviator (Velas)</span>
+            <span className="whitespace-nowrap"><span className="sm:hidden">Aviator</span><span className="hidden sm:inline">Radar Aviator (Velas)</span></span>
           </button>
 
           <button
@@ -571,14 +571,14 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
               setActiveRadarMode('SLOTS');
               localStorage.setItem('aviator_radar_mode', 'SLOTS');
             }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition shrink-0 ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black transition shrink-0 ${
               activeRadarMode === 'SLOTS'
-                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black shadow-lg shadow-amber-500/30'
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black shadow-md shadow-amber-500/30'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
             <span>🎰</span>
-            <span>Slots Assertivos (Tiger, Rabbit, Ox, Olympus)</span>
+            <span className="whitespace-nowrap"><span className="sm:hidden">Slots</span><span className="hidden sm:inline">Slots Assertivos</span></span>
             <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping ml-0.5" />
           </button>
 
@@ -587,20 +587,20 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
               setActiveRadarMode('UNIFIED');
               localStorage.setItem('aviator_radar_mode', 'UNIFIED');
             }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition shrink-0 ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black transition shrink-0 ${
               activeRadarMode === 'UNIFIED'
-                ? 'bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow-lg shadow-sky-600/30'
+                ? 'bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow-md shadow-sky-600/30'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
             <span>⚡</span>
-            <span>Radar Geral (Aviator + Slots ao Vivo)</span>
+            <span className="whitespace-nowrap"><span className="sm:hidden">Radar Geral</span><span className="hidden sm:inline">Radar Geral (Ao Vivo)</span></span>
           </button>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-400 pr-2">
+        <div className="hidden lg:flex items-center gap-2 text-[11px] text-slate-400 pr-2 shrink-0">
           <Crosshair className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Avisos no segundo exato com beeps e voz falada</span>
+          <span>Avisos no segundo exato com beeps e voz</span>
         </div>
       </div>
 
@@ -656,7 +656,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
           {/* CARD 1: RESULTADO DA MESA - ÚLTIMA VELA QUE ACABOU DE SAIR (HORA, MINUTO E SEGUNDO) */}
           {/* ========================================================================= */}
           <div
-            className={`rounded-2xl border p-4 shadow-lg transition-all ${
+            className={`rounded-2xl border p-3 sm:p-4 shadow-lg transition-all ${
               isLastCandlePink
                 ? 'border-pink-500/70 bg-gradient-to-r from-pink-950/80 to-slate-900 shadow-pink-500/15'
                 : isLastCandlePurple
@@ -664,38 +664,38 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                 : 'border-blue-700/60 bg-gradient-to-r from-blue-950/70 to-slate-900 shadow-blue-500/10'
             }`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">
-                  Resultado da Mesa • Última Vela Saída
+            <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 border-b border-slate-800 pb-2 sm:pb-2.5">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="flex h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-300">
+                  Resultado da Mesa • Última Vela
                 </span>
-                <span className="rounded bg-pink-500/20 border border-pink-500/30 px-1.5 py-0.5 text-[9px] font-mono font-black text-pink-300">
-                  HORA : MINUTO : SEGUNDO
+                <span className="hidden xs:inline rounded bg-pink-500/20 border border-pink-500/30 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-mono font-black text-pink-300">
+                  H:M:S
                 </span>
               </div>
               
               {/* Top Clock Badge with Exact Seconds */}
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 font-mono text-xs">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-slate-400">Saída:</span>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1 sm:gap-1.5 rounded-lg border border-slate-700/80 bg-slate-950/80 px-2 py-0.5 sm:px-2.5 sm:py-1 font-mono text-[11px] sm:text-xs">
+                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />
+                  <span className="text-slate-400 hidden xs:inline">Saída:</span>
                   <span className="font-black text-amber-300">{lastExitHourStr}:{lastExitMinStr}:</span>
                   <span className="font-black text-emerald-400">{lastExitSecStr}s</span>
                 </div>
                 {lastCandle && (
-                  <span className="rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[10px] text-slate-400">
+                  <span className="rounded-md bg-slate-800/80 px-1.5 py-0.5 sm:px-2 sm:py-1 font-mono text-[9px] sm:text-[10px] text-slate-400">
                     {elapsedExitText}
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+            <div className="pt-2.5 sm:pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 {/* Large Pill with Exact Multiplier */}
                 <div
-                  className={`rounded-2xl border-2 px-4 py-2 font-mono text-3xl sm:text-4xl font-black shadow-md ${
+                  className={`rounded-2xl border-2 px-3 py-1.5 sm:px-4 sm:py-2 font-mono text-2xl sm:text-4xl font-black shadow-md ${
                     isLastCandlePink
                       ? 'border-pink-400 bg-pink-600/30 text-pink-200 shadow-pink-500/40 animate-pulse'
                       : isLastCandlePurple
@@ -706,10 +706,10 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                   {lastCandle ? `${lastCandle.multiplier.toFixed(2)}x` : '--'}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-0.5 sm:space-y-1">
                   <div className="flex items-center gap-1.5">
                     <span
-                      className={`text-sm font-black uppercase tracking-wide ${
+                      className={`text-xs sm:text-sm font-black uppercase tracking-wide ${
                         isLastCandlePink
                           ? 'text-pink-400'
                           : isLastCandlePurple
@@ -727,12 +727,12 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
 
                   {/* Exact Exit Timing Breakdown */}
                   {lastCandle ? (
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
                       <span className="rounded-lg border border-slate-700 bg-slate-950/80 px-2 py-0.5 font-mono text-slate-300">
                         🕒 <strong>{lastExitHourStr}h {lastExitMinStr}m</strong> <strong className="text-emerald-400 font-black">{lastExitSecStr}s</strong>
                       </span>
-                      <span className="text-[11px] text-slate-400">
-                        Minuto: <strong className="text-amber-300 font-mono">:{lastExitMinStr}</strong> • Segundo do Crash: <strong className="text-emerald-400 font-mono">:{lastExitSecStr}s</strong>
+                      <span className="text-[10px] sm:text-[11px] text-slate-400">
+                        Minuto: <strong className="text-amber-300 font-mono">:{lastExitMinStr}</strong> • Crash: <strong className="text-emerald-400 font-mono">:{lastExitSecStr}s</strong>
                       </span>
                     </div>
                   ) : (
@@ -746,7 +746,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
               {/* Status info & Quick Sync Trigger */}
               <div className="flex items-center sm:flex-col sm:items-end justify-between gap-2 shrink-0 border-t sm:border-t-0 border-slate-800/80 pt-2 sm:pt-0">
                 <div className="text-left sm:text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 block">
                     Ciclo da Rosa
                   </span>
                   <span className="font-mono text-xs font-black text-pink-300">
@@ -759,11 +759,11 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                 <button
                   type="button"
                   onClick={onOpenSyncModal}
-                  className="flex items-center gap-1.5 rounded-lg border border-pink-500/40 bg-pink-500/10 hover:bg-pink-500/20 px-2.5 py-1 text-xs font-bold text-pink-300 transition"
+                  className="flex items-center gap-1 rounded-lg border border-pink-500/40 bg-pink-500/10 hover:bg-pink-500/20 px-2 sm:px-2.5 py-1 text-xs font-bold text-pink-300 transition"
                   title="Calibrar resultado das mesas com a hora, minuto e segundo da última saída"
                 >
                   <RefreshCw className="w-3 h-3 text-pink-400" />
-                  <span>Sincronizar Mesa</span>
+                  <span>Sincronizar</span>
                 </button>
               </div>
             </div>
@@ -773,7 +773,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
           {/* CARD 2: PREVISÃO DO RADAR - PRÓXIMA VELA A ENTRAR COM SEGUNDO EXATO */}
           {/* ========================================================================= */}
           <div
-            className={`relative overflow-hidden rounded-3xl border-2 p-5 shadow-2xl transition-all ${
+            className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 p-3.5 sm:p-5 shadow-2xl transition-all ${
               isPinkUpcoming
                 ? 'border-pink-500 bg-gradient-to-b from-pink-950/70 via-slate-900 to-slate-950 shadow-pink-500/20 ring-1 ring-pink-500/40'
                 : 'border-purple-500 bg-gradient-to-b from-purple-950/70 via-slate-900 to-slate-950 shadow-purple-500/20 ring-1 ring-purple-500/40'
@@ -782,9 +782,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
             {/* Top Selector: Alvo do Monitoramento & Controles de Áudio dos Segundos */}
             <div className="flex flex-col gap-2.5 border-b border-slate-800/80 pb-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <span
-                    className={`flex h-3.5 w-3.5 rounded-full ${
+                    className={`flex h-3 w-3 sm:h-3.5 sm:w-3.5 rounded-full ${
                       isShootingActive
                         ? 'bg-emerald-400 animate-ping'
                         : isPinkUpcoming
@@ -792,10 +792,10 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                         : 'bg-purple-400 animate-pulse'
                     }`}
                   />
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-300">
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-slate-300">
                     Próxima Vela a Entrar
                   </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                     <Crosshair className="w-3 h-3 text-emerald-400" />
                     <span>Precisão de Segundos</span>
                   </span>
@@ -840,15 +840,15 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
               </div>
 
               {/* Sub-bar: Audio Notification & Voice for Exact Entry Seconds */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pt-1">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                   <span className="text-[10px] font-semibold text-slate-400">
-                    Avisos da Entrada:
+                    Avisos:
                   </span>
                   {/* Voice Button */}
                   <button
                     onClick={handleToggleVoice}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black transition border ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition border ${
                       voiceAnnounceEnabled
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                         : 'bg-slate-900 text-slate-500 border-slate-800'
@@ -866,7 +866,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                   {/* Countdown Beeps Button */}
                   <button
                     onClick={handleToggleBeep}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black transition border ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition border ${
                       countdownBeepEnabled
                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                         : 'bg-slate-900 text-slate-500 border-slate-800'
@@ -882,101 +882,97 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                 <button
                   onClick={handleTestAudioCountdown}
                   disabled={isTestingAudio}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700"
                   title="Testar som de beeps e voz dos segundos agora"
                 >
                   <Play className={`w-3 h-3 ${isTestingAudio ? 'animate-spin text-pink-400' : 'text-slate-400'}`} />
-                  <span>{isTestingAudio ? 'Testando...' : 'Testar Áudio Segundos'}</span>
+                  <span>{isTestingAudio ? 'Testando...' : 'Testar Áudio'}</span>
                 </button>
               </div>
             </div>
 
             {/* Giant Target Indicator */}
-            <div className="py-4 text-center">
+            <div className="py-3 sm:py-4 text-center">
               {isPinkUpcoming ? (
                 <div className="space-y-1">
-                  <div className="inline-flex items-center gap-1.5 rounded-2xl bg-pink-600/20 border border-pink-500/60 px-3.5 py-1 text-xs font-black text-pink-300 uppercase tracking-wide">
+                  <div className="inline-flex items-center gap-1.5 rounded-2xl bg-pink-600/20 border border-pink-500/60 px-3 py-0.5 sm:px-3.5 sm:py-1 text-xs font-black text-pink-300 uppercase tracking-wide">
                     <Sparkles className="w-3.5 h-3.5 text-pink-400" />
                     <span>ALVO PREVISTO: VELA ROSA</span>
                   </div>
-                  <h2 className="text-4xl sm:text-5xl font-black text-pink-400 tracking-tight drop-shadow-[0_0_25px_rgba(236,72,153,0.6)]">
+                  <h2 className="text-3xl sm:text-5xl font-black text-pink-400 tracking-tight drop-shadow-[0_0_25px_rgba(236,72,153,0.6)]">
                     VELA ROSA
                   </h2>
                   <p className="text-base sm:text-lg font-black text-white">
                     Multiplicador <span className="text-pink-300">10.00x+</span>
                   </p>
-                  <span className="inline-block text-xs font-semibold text-pink-200/90 bg-pink-950/60 px-3 py-0.5 rounded-full border border-pink-500/30">
+                  <span className="inline-block text-[11px] sm:text-xs font-semibold text-pink-200/90 bg-pink-950/60 px-2.5 sm:px-3 py-0.5 rounded-full border border-pink-500/30">
                     Saque alvo: 10.00x • Proteção em 2.00x
                   </span>
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <div className="inline-flex items-center gap-1.5 rounded-2xl bg-purple-600/20 border border-purple-500/60 px-3.5 py-1 text-xs font-black text-purple-300 uppercase tracking-wide">
+                  <div className="inline-flex items-center gap-1.5 rounded-2xl bg-purple-600/20 border border-purple-500/60 px-3 py-0.5 sm:px-3.5 sm:py-1 text-xs font-black text-purple-300 uppercase tracking-wide">
                     <Zap className="w-3.5 h-3.5 text-purple-400" />
                     <span>ALVO PREVISTO: VELA ROXA</span>
                   </div>
-                  <h2 className="text-4xl sm:text-5xl font-black text-purple-400 tracking-tight drop-shadow-[0_0_25px_rgba(168,85,247,0.6)]">
+                  <h2 className="text-3xl sm:text-5xl font-black text-purple-400 tracking-tight drop-shadow-[0_0_25px_rgba(168,85,247,0.6)]">
                     VELA ROXA
                   </h2>
                   <p className="text-base sm:text-lg font-black text-white">
                     Multiplicador <span className="text-purple-300">2.00x a 3.50x</span>
                   </p>
-                  <span className="inline-block text-xs font-semibold text-purple-200/90 bg-purple-950/60 px-3 py-0.5 rounded-full border border-purple-500/30">
+                  <span className="inline-block text-[11px] sm:text-xs font-semibold text-purple-200/90 bg-purple-950/60 px-2.5 sm:px-3 py-0.5 rounded-full border border-purple-500/30">
                     Saque seguro no alvo exato de 2.00x
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Crucial Parameters Box: Exact Minute & EXACT ENTRY SECOND & Countdown */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5">
+            {/* Crucial Parameters Box: Exact Minute & EXACT ENTRY SECOND & Countdown (Compact 3 columns on all devices) */}
+            <div className="grid grid-cols-3 gap-1 sm:gap-2.5 rounded-xl sm:rounded-2xl border border-slate-800 bg-slate-950/90 p-2 sm:p-3.5">
               {/* Col 1: Target Minute */}
-              <div className="space-y-1 border-b sm:border-b-0 sm:border-r border-slate-800/80 pb-2 sm:pb-0 sm:pr-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Minuto da Entrada</span>
+              <div className="space-y-0.5 sm:space-y-1 border-r border-slate-800/80 pr-1 sm:pr-2">
+                <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-0.5 sm:gap-1">
+                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" />
+                  <span className="truncate">Minuto</span>
                 </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-3xl font-black text-amber-300">
+                <div className="flex items-baseline gap-0.5">
+                  <span className="font-mono text-xl sm:text-3xl font-black text-amber-300">
                     :{targetMinute}
                   </span>
-                  <span className="text-xs text-slate-400">min</span>
                 </div>
-                <span className="text-[10px] text-slate-500 block truncate">
-                  Horário: {exactTargetTime}
+                <span className="text-[8px] sm:text-[10px] text-slate-500 block truncate">
+                  {exactTargetTime}
                 </span>
               </div>
 
               {/* Col 2: EXACT ENTRY SECOND (O foco solicitado) */}
-              <div className="space-y-1 border-b sm:border-b-0 sm:border-r border-slate-800/80 pb-2 sm:pb-0 sm:px-2 bg-slate-900/40 rounded-xl p-1.5 sm:p-0">
-                <span className="text-[11px] font-black uppercase tracking-wider flex items-center justify-between text-emerald-400">
-                  <span className="flex items-center gap-1">
-                    <Crosshair className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                    <span>Segundo Exato</span>
-                  </span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    PRECISÃO
+              <div className="space-y-0.5 sm:space-y-1 border-r border-slate-800/80 px-1 sm:px-2 bg-slate-900/40 rounded-lg sm:rounded-xl p-1 sm:p-0">
+                <span className="text-[9px] sm:text-[11px] font-black uppercase tracking-wider flex items-center justify-between text-emerald-400">
+                  <span className="flex items-center gap-0.5 sm:gap-1 truncate">
+                    <Crosshair className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 animate-pulse shrink-0" />
+                    <span className="truncate">Segundo</span>
                   </span>
                 </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-3xl font-black text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]">
+                <div className="flex items-baseline gap-0.5">
+                  <span className="font-mono text-xl sm:text-3xl font-black text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]">
                     :{targetSecondStr}s
                   </span>
                 </div>
-                <span className="text-[10px] font-semibold text-emerald-300/90 block truncate" title={`Janela: ${secondWindow}`}>
-                  Janela: {secondWindow}
+                <span className="text-[8px] sm:text-[10px] font-semibold text-emerald-300/90 block truncate" title={`Janela: ${secondWindow}`}>
+                  {secondWindow}
                 </span>
               </div>
 
               {/* Col 3: Live Countdown */}
-              <div className="space-y-1 sm:text-right sm:pl-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center sm:justify-end gap-1">
-                  <Timer className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Contagem Regressiva</span>
+              <div className="space-y-0.5 sm:space-y-1 text-right pl-1 sm:pl-2">
+                <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-end gap-0.5 sm:gap-1">
+                  <Timer className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-400 shrink-0" />
+                  <span className="truncate">Contagem</span>
                 </span>
-                <div className="flex items-baseline sm:justify-end gap-1">
+                <div className="flex items-baseline justify-end gap-0.5">
                   <span
-                    className={`font-mono text-3xl font-black ${
+                    className={`font-mono text-xl sm:text-3xl font-black ${
                       isShootingActive
                         ? 'text-emerald-400 animate-pulse'
                         : isCriticalCountdown
@@ -989,10 +985,8 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                     {isShootingActive ? 'AGORA!' : formatCountdown(Math.max(0, secondsLeft))}
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400 font-semibold block">
-                  {isShootingActive
-                    ? '🎯 Zona de tiro aberta'
-                    : `Faltam ${Math.max(0, secondsLeft)} segundos`}
+                <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold block truncate">
+                  {isShootingActive ? '🎯 Aberta' : `${Math.max(0, secondsLeft)}s`}
                 </span>
               </div>
             </div>
@@ -1231,8 +1225,8 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
           <div
             className={`flex flex-col rounded-3xl border border-slate-800 bg-black overflow-hidden shadow-2xl ${
               isFullscreenGame
-                ? 'fixed inset-0 z-50 p-4 bg-slate-950'
-                : 'lg:col-span-7 h-[680px]'
+                ? 'fixed inset-0 z-50 p-2 sm:p-4 bg-slate-950'
+                : 'lg:col-span-7 h-[460px] sm:h-[560px] lg:h-[680px]'
             }`}
           >
             {/* Game Header Bar */}

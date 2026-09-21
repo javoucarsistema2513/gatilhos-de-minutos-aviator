@@ -597,7 +597,7 @@ ${isPink ? '🚨 <b>ALERTA MÁXIMO: CICLO DE VELA ROSA (10X+)</b> 🚨' : '⚡ <
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col selection:bg-pink-500 selection:text-white">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#0b0f19] text-slate-100 flex flex-col selection:bg-pink-500 selection:text-white">
       {/* Top Navigation */}
       <Navbar
         soundEnabled={soundEnabled}
@@ -613,7 +613,7 @@ ${isPink ? '🚨 <b>ALERTA MÁXIMO: CICLO DE VELA ROSA (10X+)</b> 🚨' : '⚡ <
       />
 
       {/* Main Single-Screen Canvas: Focused Signal Monitor */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-3 sm:px-6 sm:py-5">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-2.5 py-2.5 sm:px-6 sm:py-5 overflow-x-hidden">
         <FocusedSignalMonitor
           candles={candles}
           statistics={statistics}
