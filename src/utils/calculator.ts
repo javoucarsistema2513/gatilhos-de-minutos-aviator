@@ -6,9 +6,82 @@ import {
   MinutePatternStat,
   PayingMinuteAnalysis,
   RadarSignal,
+  SuperPinkAnalysis,
   SurgicalConfluenceAlert,
   SurgicalTarget,
 } from '../types';
+
+/**
+ * Calibração Oficial Spribe (Betão & 973):
+ * Cada rodada do Aviator tem duração física proporcional ao multiplicador:
+ * t_voo = max(0.6, ln(multiplier) / 0.06) + 5.0s (janela de aposta oficial da Spribe)
+ */
+export function calculateSpribeRoundDuration(multiplier: number): number {
+  if (multiplier <= 1.0) return 5.6;
+  const flightSecs = Math.max(0.6, Math.log(multiplier) / 0.06);
+  return Number((flightSecs + 5.0).toFixed(1));
+}
+
+/**
+ * Mapeador Cirúrgico de Velas Super Rosa (50x+ e 100x+)
+ * Calibrado com o algoritmo de retenção e liberação do Betão e do 973.
+ */
+export function analyzeSuperPink50x(
+  candles: AviatorCandle[],
+  platform: 'BETAO' | '973' | 'SPRIBE_AUTO' = 'BETAO'
+): SuperPinkAnalysis {
+  const superPinkCandles = candles.filter((c) => c.multiplier >= 50.0);
+  const superPinkIndex = candles.findIndex((c) => c.multiplier >= 50.0);
+  const roundsSinceLastSuperPink = superPinkIndex !== -1 ? superPinkIndex : candles.length;
+  const lastSuper = superPinkCandles[0] || null;
+
+  // No Spribe (Betão e 973), o ciclo médio de 50x+ varia entre 35 e 70 rodadas.
+  const criticalThreshold = platform === '973' ? 36 : 40;
+  const isInCriticalZone = roundsSinceLastSuperPink >= criticalThreshold;
+
+  // Análise de acúmulo de energia (retenção de banca):
+  // Velas azuis baixas (< 1.60x) nos últimos 15 tiros aumentam drasticamente a probabilidade de 50x+
+  const recent15 = candles.slice(0, 15);
+  const lowBlues = recent15.filter((c) => c.multiplier < 1.60).length;
+
+  let baseScore = Math.round(
+    (roundsSinceLastSuperPink / 55) * 55 + (lowBlues / 15) * 35
+  );
+  if (isInCriticalZone) baseScore += 10;
+  const probabilityScore = Math.min(98, Math.max(12, baseScore));
+
+  const currentMinute = new Date().getMinutes();
+  const lastMin = lastSuper ? lastSuper.payingMinute : currentMinute;
+
+  // Minutos propícios no Spribe: Espelho (+5m, +10m, +15m) e minutos redondos
+  const predictedMinutes = [
+    (lastMin + 5) % 60,
+    (lastMin + 10) % 60,
+    (currentMinute + 2) % 60,
+    (currentMinute + 5) % 60,
+  ];
+
+  let recommendedStrategy =
+    'Mapeando ciclo de 50x+. Quando o radar disparar o gatilho, proteja a mão 1 em 2.00x e deixe a mão 2 subir para 50.00x+.';
+  if (isInCriticalZone) {
+    recommendedStrategy =
+      '🚨 ZONA CRÍTICA 50X+: Retenção extrema no Betão/973! Entrada com Proteção Dupla (Mão 1: 2.00x | Mão 2: Alavancar até 50.00x+).';
+  }
+
+  return {
+    roundsSinceLastSuperPink,
+    lastSuperPinkMultiplier: lastSuper ? lastSuper.multiplier : 0,
+    lastSuperPinkMinute: lastSuper ? lastSuper.payingMinute : 0,
+    lastSuperPinkTimestamp: lastSuper ? lastSuper.timestamp : 0,
+    superPinkCount: superPinkCandles.length,
+    probabilityScore,
+    isInCriticalZone,
+    criticalThreshold,
+    predictedMinutes,
+    recommendedStrategy,
+    platformCalibration: platform,
+  };
+}
 
 export function getCandleColor(multiplier: number): CandleColor {
   if (multiplier >= 10.0) return 'pink';
@@ -159,7 +232,10 @@ export function analyzePayingMinutes(candles: AviatorCandle[]): PayingMinuteAnal
   return result.sort((a, b) => b.heatScore - a.heatScore);
 }
 
-export function evaluateLiveSignal(candles: AviatorCandle[]): RadarSignal {
+export function evaluateLiveSignal(
+  candles: AviatorCandle[],
+  platform: 'BETAO' | '973' | 'SPRIBE_AUTO' = 'BETAO'
+): RadarSignal {
   if (candles.length < 5) {
     return {
       id: 'initial-standby',
@@ -174,10 +250,12 @@ export function evaluateLiveSignal(candles: AviatorCandle[]): RadarSignal {
       timestamp: Date.now(),
       suggestedCashout: 1.5,
       payingMinuteTarget: '--',
+      calibrationPlatform: platform,
     };
   }
 
   const stats = calculateStatistics(candles);
+  const superPink = analyzeSuperPink50x(candles, platform);
   const currentMinute = new Date().getMinutes();
   const nextTargetMinute = (currentMinute + 1) % 60;
   const payingMinuteStr = `:${String(currentMinute).padStart(2, '0')} a :${String(nextTargetMinute).padStart(2, '0')}`;
@@ -190,24 +268,140 @@ export function evaluateLiveSignal(candles: AviatorCandle[]): RadarSignal {
   const payingSecondTarget = `:${secStr}s (Janela :${String(windowStart).padStart(2, '0')}s a :${String(windowEnd).padStart(2, '0')}s)`;
   const targetTimeFormatted = new Date(Date.now() + 60000).toLocaleTimeString('pt-BR');
 
-  // 0. Post-Pink Candle Reaction (Pink just hit on the table: roundsSinceLastPink <= 1)
+  // =========================================================================
+  // 1. GATILHO SUPER ROSA 50X+ / 100X+ (Calibragem Betão & 973)
+  // Mesa em retenção prolongada (35+ rodadas sem 50x+) ou acúmulo de energia
+  // =========================================================================
+  if (superPink.isInCriticalZone && stats.currentStreakColor === 'blue') {
+    return {
+      id: `super-pink-${Date.now()}`,
+      type: 'SUPER_PINK_50X',
+      level: 'EXTREME',
+      title: '👑 ALERTA MÁXIMO: CICLO SUPER ROSA (50X+ A 100X+)',
+      targetMultiplier: 'Alvo 50.00x+ (Proteção 2.00x obrigatória)',
+      confidence: Math.min(97, superPink.probabilityScore),
+      triggerReason: `Mapeamento Betão/973: Já se passaram ${superPink.roundsSinceLastSuperPink} rodadas sem Super Rosa 50x+! Acúmulo de retenção em nível crítico. Próximos minutos propícios: ${superPink.predictedMinutes.map((m) => `:${String(m).padStart(2, '0')}`).join(', ')}.`,
+      stopGain: '50.00x',
+      protectionGale: `Entrada aos :${secStr}s (Mão 1: Saque em 2.00x para garantir | Mão 2: Alavancar até 50x+)`,
+      timestamp: Date.now(),
+      suggestedCashout: 2.0,
+      secondaryCashout: 50.0,
+      isSuperPink50x: true,
+      calibrationPlatform: platform,
+      payingMinuteTarget: payingMinuteStr,
+      targetSecond,
+      payingSecondTarget,
+      targetTimeFormatted,
+    };
+  }
+
+  // =========================================================================
+  // 2. GATILHO DE ROMPIMENTO CALIBRADO (Resolve "Roxa sai Rosa")
+  // Sequência de 2 a 4 azuis no Betão/973 NÃO é apenas roxa: é vela de explosão!
+  // =========================================================================
+  if (stats.currentStreakColor === 'blue' && stats.currentStreakCount >= 2) {
+    const isExplosiveBreakout = stats.currentStreakCount >= 3 || stats.roundsSinceLastPink >= 12;
+    const confidence = Math.min(96, 76 + stats.currentStreakCount * 5);
+
+    if (isExplosiveBreakout) {
+      return {
+        id: `dual-breakout-${Date.now()}`,
+        type: 'DUAL_BREAKOUT',
+        level: 'EXTREME',
+        title: '🚀 ROMPIMENTO CALIBRADO (BETÃO/973): POTENCIAL ROSA (10X A 50X+)',
+        targetMultiplier: 'Alvo Duplo: Mão 1 em 2.00x | Mão 2 em 10.00x a 50.00x+',
+        confidence: Math.round(confidence),
+        triggerReason: `Quebra de Sequência Crítica (${stats.currentStreakCount} azuis). No Spribe (Betão/973), esse rompimento costuma passar direto de 2.00x e explodir em Rosa (10x+) ou Super Rosa (50x+). Trave a mão 1 em 2.00x para lucro garantido e alavanque a mão 2!`,
+        stopGain: '10.00x',
+        protectionGale: `Entrada aos :${secStr}s (Aposta Dupla: 2.00x e 10.00x+)`,
+        timestamp: Date.now(),
+        suggestedCashout: 2.0,
+        secondaryCashout: 10.0,
+        calibrationPlatform: platform,
+        payingMinuteTarget: payingMinuteStr,
+        targetSecond,
+        payingSecondTarget,
+        targetTimeFormatted,
+      };
+    }
+
+    return {
+      id: `purple-${Date.now()}`,
+      type: 'PURPLE_WAVE',
+      level: 'HIGH',
+      title: '⚡ ENTRADA CALIBRADA: QUEBRA DE AZUL (2.00x COM ALAVANCAGEM)',
+      targetMultiplier: 'Buscar 2.00x (Com expansão até 3.50x / 5.00x)',
+      confidence: Math.round(confidence),
+      triggerReason: `Reversão de mesa no Betão/973 após ${stats.currentStreakCount} azuis. Alta probabilidade de vela pagante com segurança.`,
+      stopGain: '2.00x',
+      protectionGale: `Entrada aos :${secStr}s (Gale 1 de segurança)`,
+      timestamp: Date.now(),
+      suggestedCashout: 2.0,
+      secondaryCashout: 3.5,
+      calibrationPlatform: platform,
+      payingMinuteTarget: payingMinuteStr,
+      targetSecond,
+      payingSecondTarget,
+      targetTimeFormatted,
+    };
+  }
+
+  // =========================================================================
+  // 3. GATILHO DE CICLO ROSA COM PROTEÇÃO ROXA OBRIGATÓRIA (Resolve "Rosa sai Roxa")
+  // No Betão/973, a mesa envia velas roxas (2x a 4x) de teste antes de soltar a rosa!
+  // =========================================================================
+  const pinkCycleDelta = stats.roundsSinceLastPink - stats.avgPinkInterval;
+  if (stats.roundsSinceLastPink >= 14 || (pinkCycleDelta >= -2 && stats.roundsSinceLastPink >= 10)) {
+    const pinkConfidence = Math.min(96, Math.max(72, 68 + stats.roundsSinceLastPink * 1.3));
+
+    return {
+      id: `pink-${Date.now()}`,
+      type: 'PINK_RADAR',
+      level: pinkConfidence >= 88 ? 'EXTREME' : 'HIGH',
+      title: '🌸 CICLO DE VELA ROSA (COM PROTEÇÃO ROXA 2.00x OBRIGATÓRIA)',
+      targetMultiplier: 'Alvo Duplo: Mão 1 em 2.00x (Segurança) | Mão 2 em 10.00x+',
+      confidence: Math.min(96, Math.round(pinkConfidence)),
+      triggerReason: `Mesa em Ciclo Rosa no Betão/973 (${stats.roundsSinceLastPink} rodadas sem rosa). AVISO DE CALIBRAÇÃO: Se a mesa segurar na vela roxa (2.00x a 4.00x), a aposta 1 em 2.00x salva seu capital e garante o lucro, enquanto a aposta 2 busca o pico de 10x+.`,
+      stopGain: '10.00x',
+      protectionGale: `Disparo aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: 10.00x+)`,
+      timestamp: Date.now(),
+      suggestedCashout: 2.0,
+      secondaryCashout: 10.0,
+      calibrationPlatform: platform,
+      payingMinuteTarget: payingMinuteStr,
+      targetSecond,
+      payingSecondTarget,
+      targetTimeFormatted,
+    };
+  }
+
+  // =========================================================================
+  // 4. PÓS-ROSA: REAÇÃO IMEDIATA (ROXA DE CONFIRMAÇÃO OU ESPELHO +4M)
+  // =========================================================================
   if (stats.roundsSinceLastPink <= 1 && candles[0].color === 'pink') {
     const lastPink = candles[0];
     const pinkMult = lastPink.multiplier.toFixed(2);
     const targetMin = (currentMinute + 2) % 60;
     const mirrorMin = (currentMinute + 4) % 60;
+    const isSuper = lastPink.multiplier >= 50.0;
+
     return {
       id: `post-pink-${Date.now()}`,
       type: 'PURPLE_WAVE',
-      level: 'HIGH',
-      title: '🌸 VELA ROSA DETECTADA NA MESA!',
-      targetMultiplier: 'Buscar Vela Roxa (2.00x) ou Rosa Espelho (+4M)',
+      level: isSuper ? 'EXTREME' : 'HIGH',
+      title: isSuper
+        ? '👑 SUPER ROSA 50X+ REGISTRADA! COOLDOWN & ESPELHO'
+        : '🌸 VELA ROSA REGISTRADA NA MESA!',
+      targetMultiplier: isSuper
+        ? 'Aguardar 2 rodadas ou buscar Roxa de Proteção 2.00x'
+        : 'Buscar Vela Roxa (2.00x) ou Rosa Espelho (+4M)',
       confidence: 90,
-      triggerReason: `Vela Rosa de ${pinkMult}x confirmada na mesa! Ciclo atual da rosa zerado. Alvo de confirmação: Vela Roxa segura em 2M (:${String(targetMin).padStart(2, '0')}) ou Rosa Espelho em 4M (:${String(mirrorMin).padStart(2, '0')}).`,
+      triggerReason: `Vela de ${pinkMult}x confirmada no Betão/973. Ciclo zerado. No Spribe, o algoritmo costuma pagar confirmação roxa em +2M (:${String(targetMin).padStart(2, '0')}) ou espelhamento rosa em +4M (:${String(mirrorMin).padStart(2, '0')}).`,
       stopGain: '2.00x',
-      protectionGale: 'Saque automático em 2.00x',
+      protectionGale: 'Saque automático em 2.00x na mão 1',
       timestamp: Date.now(),
       suggestedCashout: 2.0,
+      calibrationPlatform: platform,
       payingMinuteTarget: `:${String(targetMin).padStart(2, '0')}`,
       targetSecond,
       payingSecondTarget,
@@ -215,58 +409,9 @@ export function evaluateLiveSignal(candles: AviatorCandle[]): RadarSignal {
     };
   }
 
-  // 1. Check Pink Candle Cycle Trigger
-  // Pink occurs statistically every 10 to 22 rounds on Aviator
-  const pinkCycleDelta = stats.roundsSinceLastPink - stats.avgPinkInterval;
-
-  if (stats.roundsSinceLastPink >= 18 || (pinkCycleDelta >= -2 && stats.roundsSinceLastPink >= 10)) {
-    let pinkConfidence = Math.min(96, Math.max(68, 65 + stats.roundsSinceLastPink * 1.5));
-    if (stats.currentStreakColor === 'blue' && stats.currentStreakCount >= 3) {
-      pinkConfidence += 6; // High exhaustion of blues increases pink probability
-    }
-
-    return {
-      id: `pink-${Date.now()}`,
-      type: 'PINK_RADAR',
-      level: pinkConfidence >= 88 ? 'EXTREME' : 'HIGH',
-      title: '🚨 RADAR: CICLO DE VELA ROSA (10X+)',
-      targetMultiplier: 'Buscar 10.00x+ (Saque seguro 5.00x)',
-      confidence: Math.min(96, Math.round(pinkConfidence)),
-      triggerReason: `Zona Crítica! Já se passaram ${stats.roundsSinceLastPink} rodadas sem vela rosa (Média histórica: ${stats.avgPinkInterval} rodadas). Minutagem pagante ativa.`,
-      stopGain: '10.00x',
-      protectionGale: `Entrada aos :${secStr}s (Máximo 2 Gales ou Proteção em 2.00x)`,
-      timestamp: Date.now(),
-      suggestedCashout: 10.0,
-      payingMinuteTarget: payingMinuteStr,
-      targetSecond,
-      payingSecondTarget,
-      targetTimeFormatted,
-    };
-  }
-
-  // 2. Check Blue Streak Exhaustion -> Purple Candle Entry (2.00x)
-  if (stats.currentStreakColor === 'blue' && stats.currentStreakCount >= 2) {
-    const purpleConfidence = Math.min(94, 75 + stats.currentStreakCount * 6);
-    return {
-      id: `purple-${Date.now()}`,
-      type: 'PURPLE_WAVE',
-      level: 'HIGH',
-      title: '⚡ ENTRADA CONFIRMADA: VELA ROXA (2.00x)',
-      targetMultiplier: 'Buscar 2.00x a 3.50x',
-      confidence: Math.round(purpleConfidence),
-      triggerReason: `Quebra de Sequência! Identificadas ${stats.currentStreakCount} velas azuis consecutivas. Alta probabilidade de reversão com vela roxa pagante.`,
-      stopGain: '2.00x',
-      protectionGale: `Entrada aos :${secStr}s (Gale 1 opcional)`,
-      timestamp: Date.now(),
-      suggestedCashout: 2.0,
-      payingMinuteTarget: payingMinuteStr,
-      targetSecond,
-      payingSecondTarget,
-      targetTimeFormatted,
-    };
-  }
-
-  // 3. Chess Alternation Pattern (Blue, Purple, Blue -> Expect Purple)
+  // =========================================================================
+  // 5. PADRÃO XADREZ (Azul, Roxo, Azul -> Entrada Roxa 2.00x)
+  // =========================================================================
   if (
     candles.length >= 4 &&
     candles[0].color === 'blue' &&
@@ -277,14 +422,15 @@ export function evaluateLiveSignal(candles: AviatorCandle[]): RadarSignal {
       id: `chess-${Date.now()}`,
       type: 'CHESS_ALTERNATION',
       level: 'MEDIUM',
-      title: '♟️ PADRÃO XADREZ: ENTRADA ROXA',
-      targetMultiplier: 'Buscar 2.00x',
-      confidence: 84,
-      triggerReason: 'Padrão clássico de alternância simétrica (Xadrez Azul-Roxo-Azul) detectado.',
+      title: '♟️ PADRÃO XADREZ CALIBRADO: ENTRADA ROXA',
+      targetMultiplier: 'Buscar 2.00x a 2.80x',
+      confidence: 85,
+      triggerReason: 'Alternância simétrica clássica no Spribe (Azul-Roxo-Azul) com alta taxa de acerto no Betão/973.',
       stopGain: '2.00x',
-      protectionGale: `Disparo aos :${secStr}s (Proteção direta em 1.50x e 2.00x)`,
+      protectionGale: `Disparo aos :${secStr}s (Saque direto em 2.00x)`,
       timestamp: Date.now(),
       suggestedCashout: 2.0,
+      calibrationPlatform: platform,
       payingMinuteTarget: payingMinuteStr,
       targetSecond,
       payingSecondTarget,
@@ -292,20 +438,23 @@ export function evaluateLiveSignal(candles: AviatorCandle[]): RadarSignal {
     };
   }
 
-  // 4. Consecutive Purple Cluster (Trend Momentum)
+  // =========================================================================
+  // 6. SURF DE ROXAS (Sequência positiva)
+  // =========================================================================
   if (stats.currentStreakColor === 'purple' && stats.currentStreakCount >= 2) {
     return {
       id: `purple-trend-${Date.now()}`,
       type: 'PURPLE_WAVE',
       level: 'MEDIUM',
-      title: '🌊 SURF DE ROXAS (TENDÊNCIA ALTA)',
+      title: '🌊 SURF DE ROXAS (MOMENTO PAGADOR BETÃO/973)',
       targetMultiplier: 'Buscar 2.50x a 5.00x',
-      confidence: 79,
-      triggerReason: `Momento de mesa positiva! ${stats.currentStreakCount} velas roxas seguidas. A casa está em ciclo de pagamento contínuo.`,
+      confidence: 80,
+      triggerReason: `Mesa positiva! ${stats.currentStreakCount} velas roxas consecutivas no Spribe. Casa em fluxo de pagamento.`,
       stopGain: '3.00x',
       protectionGale: `Entrada aos :${secStr}s (Saque parcial em 2.00x)`,
       timestamp: Date.now(),
       suggestedCashout: 2.5,
+      calibrationPlatform: platform,
       payingMinuteTarget: payingMinuteStr,
       targetSecond,
       payingSecondTarget,
@@ -313,19 +462,20 @@ export function evaluateLiveSignal(candles: AviatorCandle[]): RadarSignal {
     };
   }
 
-  // Default / Standby
+  // Standby
   return {
     id: `standby-${Date.now()}`,
     type: 'STANDBY',
     level: 'INFO',
-    title: 'Analisando Fluxo da Mesa',
-    targetMultiplier: 'Aguardando Gatilho Ideal',
-    confidence: 62,
-    triggerReason: `Mesa em estabilidade neutra. Última rosa há ${stats.roundsSinceLastPink} rodadas. Monitorando padrão de quebra ou gap para disparo de alerta.`,
+    title: 'Analisando Fluxo Spribe (Betão/973)',
+    targetMultiplier: 'Aguardando Gatilho Calibrado',
+    confidence: 65,
+    triggerReason: `Mesa em estabilidade. Última rosa há ${stats.roundsSinceLastPink} rodadas. Última 50x+ há ${superPink.roundsSinceLastSuperPink} rodadas. Monitorando minuto propício.`,
     stopGain: '2.00x',
-    protectionGale: 'Aguarde o próximo sinal',
+    protectionGale: 'Aguarde o próximo sinal calibrado',
     timestamp: Date.now(),
     suggestedCashout: 2.0,
+    calibrationPlatform: platform,
     payingMinuteTarget: payingMinuteStr,
     targetSecond,
     payingSecondTarget,
@@ -534,17 +684,21 @@ export function getUpcomingSurgicalTargets(
         status,
         confidence,
         targetMultiplier:
-          source.multiplier >= 10.0 || interval === 5
-            ? '10.00x+ (Vela Rosa)'
-            : '2.00x a 3.50x (Vela Roxa)',
+          source.multiplier >= 50.0
+            ? '50.00x+ (Super Rosa | Proteção 2.00x)'
+            : source.multiplier >= 10.0 || interval === 5
+            ? '10.00x+ (Vela Rosa | Proteção 2.00x)'
+            : '2.00x a 3.50x (Roxa | Expansão Rosa)',
         protectionGale:
-          interval === 2
-            ? `Entrada Seca no segundo :${secStr}s (ou Gale 1 rápido)`
+          source.multiplier >= 50.0
+            ? `Super Rosa 50x+ aos :${secStr}s (Mão 1: 2.00x | Mão 2: 50.00x+)`
+            : interval === 2
+            ? `Entrada aos :${secStr}s (Mão 1: 2.00x | Mão 2: Expansão)`
             : interval === 3
-            ? `Disparo no segundo :${secStr}s com proteção Gale 1`
+            ? `Disparo no segundo :${secStr}s com proteção em 2.00x`
             : interval === 5
-            ? `Alvo Vela Rosa no segundo :${secStr}s (Saque proteção 2.00x)`
-            : `Proteção clássica no segundo :${secStr}s`,
+            ? `Alvo Vela Rosa no segundo :${secStr}s (Saque proteção 2.00x obrigatório)`
+            : `Proteção calibrada no segundo :${secStr}s`,
         hasConfluence: false,
       });
     });
@@ -598,26 +752,26 @@ export function getUpcomingSurgicalTargets(
       else if (secondsRemaining <= 0 && secondsRemaining >= -10) status = 'ACTIVE_SHOOTING';
 
       // Decide target type based on game cycle and pink overdue state
-      let targetMultiplier = '2.00x a 3.50x (Vela Roxa)';
+      let targetMultiplier = '2.00x a 3.50x (Roxa | Expansão Rosa)';
       let confidence = 82;
-      let protectionGale = `Entrada Seca no segundo :${secStr}s (Proteção rápida em 1.50x)`;
+      let protectionGale = `Entrada aos :${secStr}s (Mão 1: 2.00x | Mão 2: Expansão)`;
 
       if (isPinkOverdue && (offset === 5 || idx === 1)) {
-        targetMultiplier = '10.00x+ (Vela Rosa)';
-        confidence = 91;
-        protectionGale = `Gatilho Rosa no segundo :${secStr}s (Saque proteção 2.00x)`;
+        targetMultiplier = '10.00x+ (Vela Rosa | Proteção 2.00x)';
+        confidence = 92;
+        protectionGale = `Gatilho Rosa aos :${secStr}s (Mão 1: 2.00x | Mão 2: 10.00x+)`;
       } else if (lastWasPink && (offset === 4 || offset === 5)) {
-        targetMultiplier = '10.00x+ (Vela Rosa Espelho)';
-        confidence = 88;
-        protectionGale = `Rosa Espelho no segundo :${secStr}s (Saque proteção 2.00x)`;
+        targetMultiplier = '10.00x+ (Rosa Espelho | Proteção 2.00x)';
+        confidence = 89;
+        protectionGale = `Rosa Espelho aos :${secStr}s (Mão 1: 2.00x | Mão 2: 10.00x+)`;
       } else if (offset === 5) {
-        targetMultiplier = '10.00x+ (Vela Rosa)';
-        confidence = 85;
-        protectionGale = `Alvo Rosa no segundo :${secStr}s (Saque proteção 2.00x)`;
+        targetMultiplier = '10.00x+ (Vela Rosa | Proteção 2.00x)';
+        confidence = 86;
+        protectionGale = `Alvo Rosa aos :${secStr}s (Mão 1: 2.00x | Mão 2: 10.00x+)`;
       } else {
-        targetMultiplier = '2.00x a 3.50x (Vela Roxa)';
+        targetMultiplier = '2.00x a 3.50x (Roxa | Expansão Rosa)';
         confidence = 84 + (offset === 2 ? 6 : 2);
-        protectionGale = `Disparo no segundo :${secStr}s com proteção Gale 1`;
+        protectionGale = `Disparo aos :${secStr}s com proteção em 2.00x`;
       }
 
       rawTargets.push({

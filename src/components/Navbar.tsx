@@ -1,6 +1,6 @@
 import React from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
-import { Bell, RefreshCw, Volume2, VolumeX } from 'lucide-react';
+import { Bell, Plane, RefreshCw, Volume2, VolumeX } from 'lucide-react';
 
 interface NavbarProps {
   soundEnabled: boolean;
@@ -45,6 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2">
+              <Plane className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500 fill-rose-500/30 -rotate-12 shrink-0 animate-pulse" />
               <h1 className="text-xs sm:text-base font-black tracking-tight text-white truncate">
                 AVIATOR <span className="bg-gradient-to-r from-pink-500 to-purple-400 bg-clip-text text-transparent">RADAR VIP</span>
               </h1>

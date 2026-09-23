@@ -213,16 +213,25 @@ export const TableSynchronizerModal: React.FC<TableSynchronizerModalProps> = ({
 
           {/* Quick presets */}
           <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
-            <span className="text-slate-400 font-semibold">Exemplos rápidos:</span>
-            <div className="flex items-center gap-2">
+            <span className="text-slate-400 font-semibold">Exemplos calibrados:</span>
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 onClick={() =>
-                  handleLoadSample('1.25 1.10 3.45 1.40 12.80 2.15 1.05 4.80 1.95 2.60 1.18 18.40 2.30 1.35')
+                  handleLoadSample('1.15 1.05 2.14 1.30 1.25 15.40 2.20 1.10 3.80 1.95 2.60 1.18 54.20 2.30 1.35 1.08 1.45 2.05')
                 }
-                className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:text-white hover:border-pink-500 transition"
+                className="rounded-md border border-amber-500/40 bg-amber-950/30 px-2 py-1 text-[11px] font-bold text-amber-300 hover:bg-amber-900/50 transition"
               >
-                Sequência Padrão (14 velas)
+                Betão (com 54.20x)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleLoadSample('1.02 1.18 1.25 1.10 12.80 2.15 1.05 1.40 1.32 1.15 82.50 2.45 1.20 3.50 1.90 1.12')
+                }
+                className="rounded-md border border-emerald-500/40 bg-emerald-950/30 px-2 py-1 text-[11px] font-bold text-emerald-300 hover:bg-emerald-900/50 transition"
+              >
+                973 (com 82.50x)
               </button>
               <button
                 type="button"

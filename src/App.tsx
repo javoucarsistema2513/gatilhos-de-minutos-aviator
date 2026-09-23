@@ -15,9 +15,11 @@ import {
   NotificationLog,
   NotificationSettings,
   RadarSignal,
+  SuperPinkAnalysis,
 } from './types';
 import {
   analyzePayingMinutes,
+  analyzeSuperPink50x,
   calculateStatistics,
   evaluateLiveSignal,
   getCandleColor,
@@ -146,9 +148,32 @@ export default function App() {
     loadCandles();
   }, []);
 
-  // Compute stats and active signal
+  // Platform calibration state (Betão / 973 / Spribe Auto)
+  const [platformCalibration, setPlatformCalibration] = useState<'BETAO' | '973' | 'SPRIBE_AUTO'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('aviator_platform_calibration');
+      if (saved === 'BETAO' || saved === '973' || saved === 'SPRIBE_AUTO') return saved;
+    }
+    return 'BETAO';
+  });
+
+  const handleSelectPlatform = (platform: 'BETAO' | '973' | 'SPRIBE_AUTO') => {
+    setPlatformCalibration(platform);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aviator_platform_calibration', platform);
+    }
+  };
+
+  // Compute stats, active signal and Super Pink 50x analysis
   const statistics = useMemo(() => calculateStatistics(candles), [candles]);
-  const currentSignal = useMemo(() => evaluateLiveSignal(candles), [candles]);
+  const currentSignal = useMemo(
+    () => evaluateLiveSignal(candles, platformCalibration),
+    [candles, platformCalibration]
+  );
+  const superPinkAnalysis = useMemo(
+    () => analyzeSuperPink50x(candles, platformCalibration),
+    [candles, platformCalibration]
+  );
   const payingMinutes = useMemo(() => analyzePayingMinutes(candles), [candles]);
 
   // Dispatch API and Push Notifications
@@ -161,7 +186,7 @@ export default function App() {
 
     // Play Sound
     if (soundEnabled) {
-      if (signal.type === 'PINK_RADAR') {
+      if (signal.type === 'PINK_RADAR' || signal.type === 'SUPER_PINK_50X') {
         playPinkAlertSound();
       } else {
         playPurpleAlertSound();
@@ -171,7 +196,13 @@ export default function App() {
     // Vibration on mobile
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
-        navigator.vibrate(signal.type === 'PINK_RADAR' ? [200, 100, 200, 100, 300] : [150, 80, 150]);
+        navigator.vibrate(
+          signal.type === 'SUPER_PINK_50X'
+            ? [300, 100, 300, 100, 400]
+            : signal.type === 'PINK_RADAR'
+            ? [200, 100, 200, 100, 300]
+            : [150, 80, 150]
+        );
       } catch {
         // Ignore
       }
@@ -212,14 +243,22 @@ export default function App() {
       notificationSettings.telegram.botToken &&
       notificationSettings.telegram.chatId
     ) {
-      const isPink = signal.type === 'PINK_RADAR';
+      const isSuper = signal.type === 'SUPER_PINK_50X';
+      const isPink = signal.type === 'PINK_RADAR' || signal.type === 'DUAL_BREAKOUT';
       const shouldSend =
+        (isSuper && notificationSettings.telegram.notifyOnSuperPink) ||
         (isPink && notificationSettings.telegram.notifyOnPink) ||
-        (!isPink && notificationSettings.telegram.notifyOnPurple);
+        (!isPink && !isSuper && notificationSettings.telegram.notifyOnPurple);
 
       if (shouldSend && signal.confidence >= notificationSettings.telegram.minConfidence) {
         const text = `
-${isPink ? '🚨 <b>ALERTA MÁXIMO: CICLO DE VELA ROSA (10X+)</b> 🚨' : '⚡ <b>SINAL CONFIRMADO: VELA ROXA (2.00x)</b> ⚡'}
+${
+  isSuper
+    ? '👑 <b>ALERTA SUPER ROSA 50X+ (CALIBRAGEM BETÃO / 973)</b> 👑'
+    : isPink
+    ? '🚨 <b>ALERTA RADAR: VELA ROSA (ALVO DUPLO COM PROTEÇÃO 2.00x)</b> 🚨'
+    : '⚡ <b>SINAL CONFIRMADO: VELA ROXA (2.00x)</b> ⚡'
+}
 
 🎯 <b>Alvo Sugerido:</b> ${signal.targetMultiplier}
 📈 <b>Confiança do Radar:</b> ${signal.confidence}%
@@ -228,7 +267,7 @@ ${isPink ? '🚨 <b>ALERTA MÁXIMO: CICLO DE VELA ROSA (10X+)</b> 🚨' : '⚡ <
 🛡️ <b>Proteção / Entrada:</b> ${signal.protectionGale}
 📊 <b>Análise:</b> ${signal.triggerReason}
 
-<i>Enviado instantaneamente por Aviator Radar PWA com precisão de segundos</i>
+<i>Enviado instantaneamente por Aviator Radar PWA • Calibrado Betão/973</i>
         `.trim();
 
         try {
@@ -618,6 +657,9 @@ ${isPink ? '🚨 <b>ALERTA MÁXIMO: CICLO DE VELA ROSA (10X+)</b> 🚨' : '⚡ <
           candles={candles}
           statistics={statistics}
           currentSignal={currentSignal}
+          superPinkAnalysis={superPinkAnalysis}
+          platformCalibration={platformCalibration}
+          onSelectPlatform={handleSelectPlatform}
           onAddCandle={handleAddCandle}
           onRemoveLastCandle={handleRemoveLastCandle}
           onOpenSyncModal={() => setIsSyncModalOpen(true)}

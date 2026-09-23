@@ -32,7 +32,27 @@ export interface CandleStatistics {
   averageMultiplier: number;
 }
 
-export type SignalType = 'PINK_RADAR' | 'PURPLE_WAVE' | 'CHESS_ALTERNATION' | 'STANDBY';
+export type SignalType =
+  | 'PINK_RADAR'
+  | 'SUPER_PINK_50X'
+  | 'PURPLE_WAVE'
+  | 'CHESS_ALTERNATION'
+  | 'DUAL_BREAKOUT'
+  | 'STANDBY';
+
+export interface SuperPinkAnalysis {
+  roundsSinceLastSuperPink: number;
+  lastSuperPinkMultiplier: number;
+  lastSuperPinkMinute: number;
+  lastSuperPinkTimestamp: number;
+  superPinkCount: number;
+  probabilityScore: number; // 0 - 100
+  isInCriticalZone: boolean;
+  predictedMinutes: number[];
+  criticalThreshold: number;
+  recommendedStrategy: string;
+  platformCalibration: 'BETAO' | '973' | 'SPRIBE_AUTO';
+}
 
 export interface RadarSignal {
   id: string;
@@ -46,6 +66,9 @@ export interface RadarSignal {
   protectionGale: string;
   timestamp: number;
   suggestedCashout: number;
+  secondaryCashout?: number; // Ex: 10x ou 50x no alvo duplo
+  calibrationPlatform?: 'BETAO' | '973' | 'SPRIBE_AUTO';
+  isSuperPink50x?: boolean;
   payingMinuteTarget: string;
   targetSecond?: number;
   payingSecondTarget?: string;

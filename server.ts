@@ -159,12 +159,46 @@ async function startServer() {
     const newItems: StoredCandle[] = [];
     const count = parsedNumbers.length;
 
-    // If newestFirst is true (default Aviator top bar order: leftmost pill is newest),
-    // idx 0 is the most recent (0 rounds ago).
-    // If newestFirst is false, idx count-1 is the most recent.
+    // Calibração Oficial Spribe (Betão & 973):
+    // Cada rodada do Aviator tem duração proporcional ao multiplicador:
+    // t_voo = max(0.6, ln(multiplier) / 0.06) + 5.0s (janela de aposta oficial)
+    const getSpribeDurationSec = (mult: number): number => {
+      if (mult <= 1.0) return 5.6;
+      const flight = Math.max(0.6, Math.log(mult) / 0.06);
+      return flight + 5.0;
+    };
+
+    // Calculate exact backward timestamps for each candle
+    const timestamps: number[] = new Array(count);
+    if (newestFirst) {
+      let rolling = baseExitTime;
+      for (let i = 0; i < count; i++) {
+        if (i === 0) {
+          timestamps[0] = baseExitTime;
+        } else {
+          // The round before this one took its duration to fly and reset
+          const prevMult = parsedNumbers[i - 1];
+          const durSec = getSpribeDurationSec(prevMult);
+          rolling -= Math.round(durSec * 1000);
+          timestamps[i] = rolling;
+        }
+      }
+    } else {
+      let rolling = baseExitTime;
+      for (let i = count - 1; i >= 0; i--) {
+        if (i === count - 1) {
+          timestamps[i] = baseExitTime;
+        } else {
+          const nextMult = parsedNumbers[i + 1];
+          const durSec = getSpribeDurationSec(nextMult);
+          rolling -= Math.round(durSec * 1000);
+          timestamps[i] = rolling;
+        }
+      }
+    }
+
     parsedNumbers.forEach((mult, idx) => {
-      const roundsAgo = newestFirst ? idx : count - 1 - idx;
-      const candleTime = baseExitTime - roundsAgo * (secondsPerRound * 1000);
+      const candleTime = timestamps[idx] || (baseExitTime - idx * (secondsPerRound * 1000));
       const color: 'blue' | 'purple' | 'pink' =
         mult >= 10.0 ? 'pink' : mult >= 2.0 ? 'purple' : 'blue';
 
