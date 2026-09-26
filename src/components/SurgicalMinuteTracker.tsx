@@ -136,7 +136,7 @@ export const SurgicalMinuteTracker: React.FC<SurgicalMinuteTrackerProps> = ({
                   PADRÕES CIRÚRGICOS DE MINUTAGEM
                 </h2>
                 <span className="rounded-md border border-pink-500/40 bg-pink-500/20 px-2 py-0.5 text-[10px] font-extrabold text-pink-300">
-                  PRECISÃO 2M • 3M • 4M • 5M
+                  PRECISÃO 4M • 5M (ROXA) • 12M (ROSA)
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -224,10 +224,10 @@ export const SurgicalMinuteTracker: React.FC<SurgicalMinuteTrackerProps> = ({
                 : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800'
             }`}
           >
-            Todos os 4 Padrões
+            Todos os Padrões (+4M, +5M, +12M)
           </button>
 
-          {([2, 3, 4, 5] as MinutePatternInterval[]).map((int) => {
+          {([4, 5, 12] as MinutePatternInterval[]).map((int) => {
             const stat = patternStats.find((s) => s.interval === int);
             const isSelected = selectedInterval === int;
             return (
@@ -244,7 +244,7 @@ export const SurgicalMinuteTracker: React.FC<SurgicalMinuteTrackerProps> = ({
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800'
                 }`}
               >
-                <span>+{int} Minutos</span>
+                <span>+{int} Minutos {int === 12 ? '(Rosa)' : '(Roxa)'}</span>
                 {stat && (
                   <span className="rounded-full bg-slate-900/80 px-1.5 py-0.2 text-[10px] text-pink-300">
                     {stat.accuracyRate}%

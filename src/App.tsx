@@ -164,11 +164,20 @@ export default function App() {
     }
   };
 
+  // Entry offset state (anti-antecipação de 1 entrada antes)
+  const [entryOffset] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('aviator_entry_offset');
+      if (saved !== null) return Number(saved);
+    }
+    return 0;
+  });
+
   // Compute stats, active signal and Super Pink 50x analysis
   const statistics = useMemo(() => calculateStatistics(candles), [candles]);
   const currentSignal = useMemo(
-    () => evaluateLiveSignal(candles, platformCalibration),
-    [candles, platformCalibration]
+    () => evaluateLiveSignal(candles, platformCalibration, entryOffset),
+    [candles, platformCalibration, entryOffset]
   );
   const superPinkAnalysis = useMemo(
     () => analyzeSuperPink50x(candles, platformCalibration),

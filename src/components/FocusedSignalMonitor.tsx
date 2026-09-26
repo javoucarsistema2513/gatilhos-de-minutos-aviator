@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   AviatorCandle,
   CandleStatistics,
+  MinutePatternInterval,
   NotificationSettings,
   RadarSignal,
   SuperPinkAnalysis,
@@ -191,6 +192,26 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     }, 1050);
   };
 
+  // Anti-antecepação de entrada (ajuste de rodada para compensar diferença de uma entrada antes)
+  const [entryOffset, setEntryOffset] = useState<number>(() => {
+    const saved = localStorage.getItem('aviator_entry_offset');
+    return saved !== null ? Number(saved) : 0;
+  });
+
+  const handleSetEntryOffset = (val: number) => {
+    setEntryOffset(val);
+    localStorage.setItem('aviator_entry_offset', String(val));
+    if (voiceAnnounceEnabled) {
+      if (val === 20) {
+        speakExactSecondsAlert('Alinhamento calibrado: mais uma rodada para corrigir entrada antes.');
+      } else if (val === -20) {
+        speakExactSecondsAlert('Alinhamento calibrado: antecipar uma rodada.');
+      } else {
+        speakExactSecondsAlert('Alinhamento calibrado: entrada no ponto exato.');
+      }
+    }
+  };
+
   // Keep precision clock ticking every second
   useEffect(() => {
     const timer = setInterval(() => {
@@ -199,10 +220,10 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Compute surgical targets and find the single next upcoming Purple or Pink candle
+  // Compute surgical targets strictly respecting +4m/+5m for purple and +12m for pink
   const { targets } = useMemo(() => {
-    return getUpcomingSurgicalTargets(candles, currentTime);
-  }, [candles, currentTime]);
+    return getUpcomingSurgicalTargets(candles, currentTime, entryOffset);
+  }, [candles, currentTime, entryOffset]);
 
   // The very last candle that came out on the table (index 0 is newest)
   const lastCandle = useMemo(() => {
@@ -308,21 +329,13 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     return sorted[0];
   }, [relevantTargets]);
 
-  // Guaranteed active target that is NEVER null, keeping the countdown and next candle announcements fully alive
+  // Guaranteed active target that is NEVER null, strictly following 4m/5m (purple) and 12m (pink) minutagem
   const activeTarget = useMemo((): SurgicalTarget => {
     if (nextTarget) return nextTarget;
 
     const now = new Date(currentTime);
-    const curSec = now.getSeconds();
     const curMin = now.getMinutes();
     const secTarget = lastCandle ? new Date(lastCandle.timestamp).getSeconds() : 18;
-
-    let diff = secTarget - curSec;
-    let targetMin = curMin;
-    if (diff < 8) {
-      diff += 60;
-      targetMin = (curMin + 1) % 60;
-    }
 
     const isSuper =
       filterMode === 'SUPER_PINK_50X' ||
@@ -333,37 +346,42 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
       !isSuper &&
       (filterMode === 'PINK_ONLY' ||
         (filterMode === 'AUTO' &&
-          (statistics.roundsSinceLastPink >= 12 ||
-            (statistics.currentStreakColor === 'blue' && statistics.currentStreakCount >= 3) ||
-            currentSignal.type === 'PINK_RADAR' ||
-            currentSignal.type === 'DUAL_BREAKOUT')));
+          (isLastCandlePink ||
+            statistics.roundsSinceLastPink >= 12 ||
+            currentSignal.type === 'PINK_RADAR')));
+
+    // Strictly respect 12m for pink and 4m for purple
+    const patternInterval: MinutePatternInterval = isPink || isSuper ? 12 : 4;
+    const targetMin = (curMin + (isPink || isSuper ? 12 : 4)) % 60;
+    const targetTimestamp = currentTime + patternInterval * 60 * 1000 + entryOffset * 1000;
+    const diff = Math.round((targetTimestamp - currentTime) / 1000);
 
     const secStr = String(secTarget).padStart(2, '0');
     return {
       id: `live-active-${targetMin}-${secTarget}`,
-      interval: isSuper ? 5 : 2,
+      interval: patternInterval,
       sourceCandleId: lastCandle?.id || 'live-anchor',
-      sourceMultiplier: lastCandle?.multiplier || 2.5,
+      sourceMultiplier: lastCandle?.multiplier || (isPink ? 12.5 : 2.5),
       sourceTimestamp: lastCandle?.timestamp || currentTime,
       sourceMinute: lastCandle?.payingMinute || curMin,
       targetMinute: targetMin,
       targetSecond: secTarget,
-      targetTimestamp: currentTime + diff * 1000,
+      targetTimestamp,
       targetTimeFormatted: `:${String(targetMin).padStart(2, '0')}`,
       secondWindow: `:${String((secTarget - 5 + 60) % 60).padStart(2, '0')}s a :${String((secTarget + 15) % 60).padStart(2, '0')}s`,
       secondsRemaining: diff,
-      status: diff > 45 ? 'WAITING' : diff > 0 ? 'PREPARE' : 'ACTIVE_SHOOTING',
-      confidence: isSuper ? 94 : isPink ? 92 : 86,
+      status: diff > 35 ? 'WAITING' : diff > 0 ? 'PREPARE' : 'ACTIVE_SHOOTING',
+      confidence: isSuper ? 94 : isPink ? 92 : 88,
       targetMultiplier: isSuper
-        ? '50.00x+ (Super Rosa | Proteção 2.00x)'
+        ? '50.00x+ (Super Rosa | Minutagem +12M)'
         : isPink
-        ? '10.00x+ (Vela Rosa | Proteção 2.00x)'
-        : '2.00x a 3.50x (Roxa | Expansão Rosa)',
+        ? '10.00x+ (Vela Rosa | Minutagem +12M)'
+        : '2.00x a 3.50x (1ª Entrada Roxa +4M)',
       protectionGale: isSuper
         ? `Super Rosa 50x+ aos :${secStr}s (Mão 1: 2.00x | Mão 2: 50.00x+)`
         : isPink
         ? `Alvo Rosa aos :${secStr}s (Mão 1: 2.00x | Mão 2: 10.00x+)`
-        : `Disparo aos :${secStr}s com proteção em 2.00x`,
+        : `Disparo aos :${secStr}s com proteção em 2.00x (Aguarde a rodada certa)`,
       hasConfluence: false,
     };
   }, [
@@ -371,6 +389,8 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     currentTime,
     lastCandle,
     filterMode,
+    isLastCandlePink,
+    entryOffset,
     superPinkAnalysis?.isInCriticalZone,
     statistics.roundsSinceLastPink,
     statistics.currentStreakColor,
@@ -511,11 +531,11 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     if (voiceAnnounceEnabled && sec === 30 && lastVoiceStepRef.current !== `${activeTarget.id}-30`) {
       lastVoiceStepRef.current = `${activeTarget.id}-30`;
       if (isSuper) {
-        speakExactSecondsAlert(`Atenção: Super Rosa 50x mais em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Mão 1 proteção em 2x, mão 2 alavancar 50x!`);
+        speakExactSecondsAlert(`Atenção: Minutagem de Super Rosa em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Aguarde a rodada certa!`);
       } else if (isPink) {
-        speakExactSecondsAlert(`Atenção: Vela Rosa 10x mais em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Proteção em 2.00x obrigatória!`);
+        speakExactSecondsAlert(`Atenção: Minutagem de 12 minutos da Vela Rosa em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Não aposte na rodada anterior!`);
       } else {
-        speakExactSecondsAlert(`Atenção: Vela Roxa prevista em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Saque seguro em 2.00x!`);
+        speakExactSecondsAlert(`Atenção: Minutagem da Vela Roxa em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Não aposte na rodada anterior!`);
       }
     }
 
@@ -523,11 +543,11 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     if (voiceAnnounceEnabled && sec === 15 && lastVoiceStepRef.current !== `${activeTarget.id}-15`) {
       lastVoiceStepRef.current = `${activeTarget.id}-15`;
       if (isSuper) {
-        speakExactSecondsAlert(`15 segundos para Super Rosa 50x! Disparo no segundo ${targetSecondStr}!`);
+        speakExactSecondsAlert(`15 segundos para Super Rosa! Aguarde o segundo ${targetSecondStr} da rodada certa!`);
       } else if (isPink) {
-        speakExactSecondsAlert(`15 segundos para Vela Rosa 10x! Disparo no segundo ${targetSecondStr}! Mão 1 proteção em 2x, mão 2 buscar 10x!`);
+        speakExactSecondsAlert(`15 segundos para Vela Rosa 12 minutos! Disparo no segundo ${targetSecondStr}! Aguarde a rodada certa!`);
       } else {
-        speakExactSecondsAlert(`15 segundos para Vela Roxa! Disparo no segundo ${targetSecondStr}! Saque seguro em 2.00x!`);
+        speakExactSecondsAlert(`15 segundos para Vela Roxa! Não aposte na rodada anterior! Disparo no segundo ${targetSecondStr}!`);
       }
     }
 
@@ -553,7 +573,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
         if (isSuper) {
           speakExactSecondsAlert(`Tiro agora no segundo ${targetSecondStr}! Entra na Super Rosa 50x mais!`);
         } else if (isPink) {
-          speakExactSecondsAlert(`Tiro agora no segundo ${targetSecondStr}! Entra na Vela Rosa 10x mais! Proteção em 2x!`);
+          speakExactSecondsAlert(`Tiro agora no segundo ${targetSecondStr}! Entra na Vela Rosa 12 minutos! Proteção em 2x!`);
         } else {
           speakExactSecondsAlert(`Tiro agora no segundo ${targetSecondStr}! Entra na Vela Roxa, saque em 2.00x!`);
         }
@@ -1085,7 +1105,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                         ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow'
                         : 'text-slate-400 hover:text-white'
                     }`}
-                    title="O Radar decide automaticamente o melhor alvo"
+                    title="O Radar decide automaticamente a próxima minutagem (+4m/+5m roxa ou +12m rosa)"
                   >
                     Automático
                   </button>
@@ -1096,9 +1116,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                         ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow shadow-amber-500/30'
                         : 'text-amber-300 hover:bg-amber-950/40'
                     }`}
-                    title="Monitorar estritamente o momento da Super Rosa (50x+ a 100x+)"
+                    title="Minutagem de Super Rosa 50x+ (+12M)"
                   >
-                    👑 Foco 50x+
+                    👑 50x+ (+12M)
                   </button>
                   <button
                     onClick={() => setFilterMode('PINK_ONLY')}
@@ -1107,9 +1127,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                         ? 'bg-pink-600 text-white shadow shadow-pink-600/30'
                         : 'text-pink-300 hover:bg-pink-950/40'
                     }`}
-                    title="Monitorar estritamente o momento da Vela Rosa (10x+)"
+                    title="Minutagem de 12 minutos (+12M) de cada Vela Rosa"
                   >
-                    🌸 Foco Rosa
+                    🌸 Rosa (+12M)
                   </button>
                   <button
                     onClick={() => setFilterMode('PURPLE_ONLY')}
@@ -1118,9 +1138,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                         ? 'bg-purple-600 text-white shadow shadow-purple-600/30'
                         : 'text-purple-300 hover:bg-purple-950/40'
                     }`}
-                    title="Monitorar estritamente o momento da Vela Roxa (2x+)"
+                    title="Minutagem de 4 minutos e 5 minutos (+4M e +5M) de cada Vela Roxa"
                   >
-                    🟣 Foco Roxa
+                    🟣 Roxa (+4M/+5M)
                   </button>
                 </div>
               </div>
@@ -1173,9 +1193,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                         ? 'bg-purple-500/20 text-purple-300 border-purple-500/50'
                         : 'bg-slate-900 text-slate-600 border-slate-800 line-through'
                     }`}
-                    title="Ativar/desativar aviso sonoro e por voz para Velas Roxas (2x+)"
+                    title="Ativar/desativar aviso para Velas Roxas (+4M e +5M)"
                   >
-                    <span>🟣 Roxas: {notifyPurpleCandles ? 'ON' : 'OFF'}</span>
+                    <span>🟣 Roxas (+4M/+5M): {notifyPurpleCandles ? 'ON' : 'OFF'}</span>
                   </button>
 
                   {/* Notify Pink Toggle */}
@@ -1186,22 +1206,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                         ? 'bg-pink-500/20 text-pink-300 border-pink-500/50'
                         : 'bg-slate-900 text-slate-600 border-slate-800 line-through'
                     }`}
-                    title="Ativar/desativar aviso sonoro e por voz para Velas Rosa (10x+)"
+                    title="Ativar/desativar aviso para Velas Rosa (+12M)"
                   >
-                    <span>🌸 Rosas 10+: {notifyPinkCandles ? 'ON' : 'OFF'}</span>
-                  </button>
-
-                  {/* Notify Super Pink Toggle */}
-                  <button
-                    onClick={handleToggleNotifySuperPink}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition border ${
-                      notifySuperPinkCandles
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                        : 'bg-slate-900 text-slate-600 border-slate-800 line-through'
-                    }`}
-                    title="Ativar/desativar aviso sonoro e por voz para Super Rosas (50x+)"
-                  >
-                    <span>👑 50x+: {notifySuperPinkCandles ? 'ON' : 'OFF'}</span>
+                    <span>🌸 Rosas (+12M): {notifyPinkCandles ? 'ON' : 'OFF'}</span>
                   </button>
                 </div>
 
@@ -1215,6 +1222,66 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                   <Play className={`w-3 h-3 ${isTestingAudio ? 'animate-spin text-pink-400' : 'text-slate-400'}`} />
                   <span>{isTestingAudio ? 'Testando...' : 'Testar Áudio'}</span>
                 </button>
+              </div>
+
+              {/* Sub-bar 2: Alinhamento de Entrada (Anti-Diferença de Uma Entrada Antes) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                    <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Calibrar Alinhamento:</span>
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSetEntryOffset(0)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition border ${
+                      entryOffset === 0
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                    title="Disparo no segundo calculado da minutagem"
+                  >
+                    Exato no Segundo (0s)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSetEntryOffset(20)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-1 border ${
+                      entryOffset === 20
+                        ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black shadow-md shadow-amber-500/20 border-amber-300'
+                        : 'bg-amber-950/30 text-amber-300 border-amber-500/40 hover:bg-amber-900/40'
+                    }`}
+                    title="Corrige se o alerta estiver disparando 1 rodada antes (+1 rodada / +20s)"
+                  >
+                    <span>⚡ +1 Rodada (Corrige 1 Antes)</span>
+                    {entryOffset === 20 && <span className="h-1.5 w-1.5 rounded-full bg-slate-950"></span>}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSetEntryOffset(-20)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition border ${
+                      entryOffset === -20
+                        ? 'bg-purple-600 text-white font-black border-purple-400'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                    title="Antecipar 1 rodada (-20s)"
+                  >
+                    -1 Rodada (-20s)
+                  </button>
+                </div>
+
+                <div className="text-[10px] font-semibold text-slate-400">
+                  {entryOffset === 20 ? (
+                    <span className="text-amber-300 font-bold">
+                      ✅ Compensando +1 rodada para evitar entrada antes
+                    </span>
+                  ) : (
+                    <span>Sincronizado com os segundos exatos</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1452,12 +1519,27 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
               )}
             </div>
 
+            {/* Anti-Antecipação Protection Banner */}
+            <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/30 p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-start sm:items-center gap-2">
+                <span className="text-amber-400 text-sm shrink-0">🛡️</span>
+                <p className="text-[11px] text-slate-300">
+                  <strong className="text-amber-300">Minutagem Oficial Calibrada:</strong> Respeita estritamente +4m/+5m da vela roxa e +12m da vela rosa. Aguarde o segundo <strong className="text-emerald-400 font-mono">:{targetSecondStr}s</strong> da rodada certa (não aposte na rodada anterior).
+                </p>
+              </div>
+              {entryOffset === 20 && (
+                <span className="shrink-0 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black uppercase">
+                  ✅ +1 Rodada Calibrada
+                </span>
+              )}
+            </div>
+
             {/* Reason Footnote */}
-            <div className="mt-3 border-t border-slate-800/80 pt-2 text-xs text-slate-400 flex items-start gap-2">
+            <div className="mt-2.5 border-t border-slate-800/80 pt-2 text-xs text-slate-400 flex items-start gap-2">
               <Sparkles className="w-4 h-4 shrink-0 text-slate-500 mt-0.5" />
               <p className="break-words min-w-0">
                 {nextTarget
-                  ? `Previsão: Padrão ${nextTarget.interval}M a partir da vela de ${nextTarget.sourceMultiplier.toFixed(2)}x. Disparo programado aos :${targetSecondStr}s (Janela ${secondWindow}).`
+                  ? `Minutagem +${nextTarget.interval}M calculada a partir da saída de ${nextTarget.sourceMultiplier.toFixed(2)}x. Disparo programado aos :${targetSecondStr}s (Janela ${secondWindow}).`
                   : currentSignal.triggerReason}
               </p>
             </div>
