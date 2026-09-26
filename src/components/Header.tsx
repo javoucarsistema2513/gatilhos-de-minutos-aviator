@@ -1,143 +1,199 @@
-import React from 'react';
-import { Volume2, VolumeX, ShieldCheck, Clock, Flame, Radio, ExternalLink, Link2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Plane,
+  Compass,
+  Clock,
+  Activity,
+  ShieldAlert,
+  Sparkles,
+  Flame,
+  FileText
+} from 'lucide-react';
+import { AIRCRAFT_PRESETS } from '../utils/aviationFormulas';
+import { AircraftPreset } from '../types/aviation';
 import { PWAInstallButton } from './PWAInstallButton';
-import { soundEffects } from '../utils/audio';
 
 interface HeaderProps {
-  currentTime: string;
-  isAudioEnabled: boolean;
-  onToggleAudio: () => void;
-  winRate: number;
-  currentStreak: number;
-  onOpenBetaoBridge?: () => void;
-  isLiveConnected?: boolean;
-  onToggleLiveFrame?: () => void;
-  isLiveFrameOpen?: boolean;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  selectedPreset: AircraftPreset;
+  onSelectPreset: (preset: AircraftPreset) => void;
+  isSimulating: boolean;
+  onToggleSimulate: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  currentTime,
-  isAudioEnabled,
-  onToggleAudio,
-  winRate,
-  currentStreak,
-  onOpenBetaoBridge,
-  isLiveConnected = false,
-  onToggleLiveFrame,
-  isLiveFrameOpen = false,
+  activeTab,
+  setActiveTab,
+  selectedPreset,
+  onSelectPreset,
+  isSimulating,
+  onToggleSimulate,
 }) => {
-  const officialGameUrl =
-    'https://d18ets18cyzpod.cloudfront.net/home/embedded?id=483312306&currency=BRL&fixed.isSaveShort=true&fixed.isHideDomain=1';
+  const [utcTime, setUtcTime] = useState<string>('');
+  const [localTime, setLocalTime] = useState<string>('');
+
+  useEffect(() => {
+    const updateClocks = () => {
+      const now = new Date();
+      // UTC / Zulu time (aviation standard)
+      const zuluHours = String(now.getUTCHours()).padStart(2, '0');
+      const zuluMins = String(now.getUTCMinutes()).padStart(2, '0');
+      const zuluSecs = String(now.getUTCSeconds()).padStart(2, '0');
+      setUtcTime(`${zuluHours}:${zuluMins}:${zuluSecs}Z`);
+
+      // Local time
+      const locHours = String(now.getHours()).padStart(2, '0');
+      const locMins = String(now.getMinutes()).padStart(2, '0');
+      const locSecs = String(now.getSeconds()).padStart(2, '0');
+      setLocalTime(`${locHours}:${locMins}:${locSecs}L`);
+    };
+
+    updateClocks();
+    const interval = setInterval(updateClocks, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const navItems = [
+    { id: 'aviator', label: 'Aviator: Minutagem & Padrões', icon: Flame, highlight: true },
+    { id: 'flightlog', label: 'Minutagem de Voo (CIV)', icon: FileText },
+    { id: 'wind', label: 'Vento & Proa (E6B)', icon: Compass },
+    { id: 'runway', label: 'Pista & Vento Cruzado', icon: ShieldAlert },
+    { id: 'altitude', label: 'Altitudes & TAS', icon: Activity },
+    { id: 'descent', label: 'Descida & TOD', icon: Plane },
+    { id: 'fuel', label: 'Combustível & Alcance', icon: Sparkles },
+    { id: 'weight', label: 'Peso & Balanceamento', icon: Activity },
+    { id: 'converter', label: 'Conversor de Unidades', icon: Compass },
+  ];
 
   return (
-    <header
-      id="app-header"
-      className="sticky top-0 z-40 w-full border-b border-rose-950/40 bg-[#0B0F19]/90 backdrop-blur-md px-3 sm:px-6 py-2.5"
-    >
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
-        {/* Brand / Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 via-rose-600 to-rose-800 shadow-md shadow-orange-600/30">
-            <span className="font-black text-white text-xs tracking-tighter">BET</span>
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0B0F19] animate-ping" />
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0B0F19]" />
-          </div>
-
-          <div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h1 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-1">
-                GATILHOS <span className="text-rose-500 font-extrabold">AVIATOR</span>
-              </h1>
-              {onToggleLiveFrame && (
-                <button
-                  onClick={onToggleLiveFrame}
-                  className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider transition ${
-                    isLiveFrameOpen
-                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
-                      : 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30'
-                  }`}
-                  title="Exibir ou ocultar mesa oficial embutida"
-                >
-                  <Radio className="w-2.5 h-2.5 text-rose-400 animate-pulse" />
-                  <span>{isLiveFrameOpen ? 'MESA ABERTA' : '📺 VER MESA'}</span>
-                </button>
-              )}
-              <button
-                onClick={onOpenBetaoBridge}
-                className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider transition ${
-                  isLiveConnected
-                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/30'
-                    : 'bg-orange-500/20 border-orange-500/40 text-orange-400 hover:bg-orange-500/30'
-                }`}
-                title="Sincronizar com a mesa oficial d18ets18cyzpod.cloudfront.net"
-              >
-                <Link2 className="w-2.5 h-2.5" />
-                <span>{isLiveConnected ? 'CLOUDFRONT CONECTADO' : 'SINCRONIZAR'}</span>
-              </button>
-            </div>
-            <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-400">
-              <span>Mesa Oficial:</span>
-              <a
-                href={officialGameUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-rose-400 hover:text-rose-300 underline font-mono flex items-center gap-0.5"
-                title="Abrir mesa oficial CloudFront em nova aba"
-              >
-                d18ets18cyzpod.cloudfront.net
-                <ExternalLink className="w-2.5 h-2.5 inline" />
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* Real-time Clock & Global Stats */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* Relógio Atômico */}
-          <div
-            id="atomic-clock"
-            className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/90 px-2.5 sm:px-3 py-1 text-slate-200 shadow-inner"
-            title="Horário Oficial em Tempo Real"
-          >
-            <Clock className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
-            <span className="font-mono text-xs sm:text-sm font-bold tracking-wider text-rose-100">
-              {currentTime}
+    <header className="bg-slate-900 border-b border-slate-800 text-slate-100 sticky top-0 z-50 shadow-md">
+      {/* Top Cockpit Telemetry Bar */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 px-2.5 py-1 rounded">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
+            <span className="font-mono font-bold tracking-wider">REAL-TIME ACTIVE</span>
           </div>
 
-          {/* Taxa de Assertividade Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3 py-1 text-emerald-400 text-xs font-bold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>{winRate}% Assertividade</span>
+          <div className="hidden sm:flex items-center space-x-2 font-mono text-slate-300">
+            <Clock className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-cyan-400 font-semibold">{utcTime}</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-400">{localTime}</span>
           </div>
-
-          {/* Streak Badge */}
-          {currentStreak > 0 && (
-            <div className="hidden sm:flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-950/30 px-2.5 py-1 text-amber-400 text-xs font-bold">
-              <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-              <span>{currentStreak} Greens Seguidos</span>
-            </div>
-          )}
-
-          {/* Botão de Áudio e Voz */}
-          <button
-            id="audio-toggle-button"
-            onClick={onToggleAudio}
-            className={`px-2.5 py-1.5 rounded-xl border font-bold text-xs transition flex items-center gap-1.5 ${
-              isAudioEnabled
-                ? 'border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 shadow-xs shadow-rose-950'
-                : 'border-slate-800 bg-slate-900 text-slate-500 hover:text-slate-300'
-            }`}
-            title={isAudioEnabled ? 'Sons e Voz Ativos (Clique para alternar)' : 'Ativar Sons e Voz'}
-            aria-label="Controle de Áudio e Voz"
-          >
-            {isAudioEnabled ? <Volume2 className="w-4 h-4 text-rose-400" /> : <VolumeX className="w-4 h-4" />}
-            <span className="hidden sm:inline">{isAudioEnabled ? 'Voz & Som ON' : 'Voz Mudo'}</span>
-          </button>
-
-          {/* PWA Install Button */}
-          <PWAInstallButton />
         </div>
+
+        {/* Aircraft Preset Selector */}
+        <div className="flex items-center space-x-2">
+          <label htmlFor="aircraft-preset-select" className="text-slate-400 text-xs hidden md:inline">
+            Aeronave:
+          </label>
+          <select
+            id="aircraft-preset-select"
+            value={selectedPreset.id}
+            onChange={(e) => {
+              const found = AIRCRAFT_PRESETS.find((p) => p.id === e.target.value);
+              if (found) onSelectPreset(found);
+            }}
+            className="bg-slate-800 border border-slate-700 text-cyan-300 text-xs rounded px-2 py-1 font-mono focus:outline-none focus:border-cyan-500 cursor-pointer"
+          >
+            {AIRCRAFT_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.cruiseSpeedKt} kt)
+              </option>
+            ))}
+          </select>
+
+          {/* Live Flight Mode simulator button */}
+          <button
+            id="toggle-live-sim-btn"
+            onClick={onToggleSimulate}
+            className={`px-2.5 py-1 rounded text-xs font-mono font-semibold transition-colors flex items-center space-x-1.5 ${
+              isSimulating
+                ? 'bg-amber-500 text-slate-950 hover:bg-amber-400 animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+            }`}
+            title="Simular voo com telemetria contínua"
+          >
+            <Plane className={`w-3 h-3 ${isSimulating ? 'rotate-45' : ''}`} />
+            <span>{isSimulating ? 'SIMULAÇÃO ATIVA' : 'MODO VOO REAL'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main App Title & Navigation Tabs */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-2 pb-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+          <div className="flex items-center space-x-3">
+            {/* Red Airplane App Icon */}
+            <div className="relative w-10 h-10 rounded-xl bg-slate-950 border border-rose-500/50 p-1 flex items-center justify-center shadow-lg shadow-rose-950/60 group">
+              <img
+                src="/icon.svg"
+                alt="Avião Vermelho AeroCalc"
+                className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+              />
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+              </span>
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                AeroCalc
+                <span className="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded bg-rose-950/80 border border-rose-600/50 text-rose-300">
+                  PWA Ready
+                </span>
+                <span className="hidden sm:inline-block text-[10px] font-mono font-normal uppercase px-2 py-0.5 rounded bg-cyan-950 border border-cyan-700/50 text-cyan-300">
+                  Aviation E6B & Aviator
+                </span>
+              </h1>
+              <p className="text-xs text-slate-400">
+                Minutagem em tempo real, projeção de velas rosas e computador de voo aeronáutico
+              </p>
+            </div>
+          </div>
+
+          {/* Right Action: PWA Install Button for All Devices */}
+          <div className="flex items-center space-x-2 self-start md:self-auto">
+            <PWAInstallButton />
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <nav className="flex space-x-1 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-700">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                id={`nav-tab-${item.id}`}
+                onClick={() => setActiveTab(item.id)}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                  isActive
+                    ? item.highlight
+                      ? 'bg-rose-600 text-white shadow-sm font-semibold'
+                      : 'bg-cyan-600 text-white shadow-sm font-semibold'
+                    : item.highlight
+                    ? 'text-rose-400 hover:text-rose-200 hover:bg-rose-950/40 border border-rose-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${item.highlight && !isActive ? 'text-rose-400' : ''}`} />
+                <span>{item.label}</span>
+                {item.highlight && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono bg-rose-500/30 text-rose-200 uppercase font-bold">
+                    HOT
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
       </div>
     </header>
   );

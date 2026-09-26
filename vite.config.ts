@@ -11,17 +11,29 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
+        includeAssets: [
+          'favicon.svg',
+          'favicon-32x32.png',
+          'apple-touch-icon.png',
+          'icon.svg',
+          'icon-maskable.svg',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png',
+        ],
         manifest: {
           id: '/',
-          name: 'Aviator Radar PWA - Velas Rosa e Roxa',
-          short_name: 'AviatorRadar',
-          description: 'Radar e calculadora de velas rosa e roxa no Aviator em tempo real com alertas instantâneos.',
-          theme_color: '#0b0f19',
-          background_color: '#0b0f19',
+          name: 'AeroCalc - Aviator & Computador de Voo',
+          short_name: 'AeroCalc',
+          description:
+            'Calculadora de minutagem do Aviator em tempo real com projeção de velas rosas e computador de voo aeronáutico.',
+          theme_color: '#020617',
+          background_color: '#020617',
           display: 'standalone',
+          orientation: 'any',
           start_url: '/',
           scope: '/',
+          categories: ['utilities', 'finance', 'productivity'],
           icons: [
             {
               src: '/pwa-192x192.png',
@@ -45,6 +57,36 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gstatic-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+          ],
         },
         devOptions: {
           enabled: true,
