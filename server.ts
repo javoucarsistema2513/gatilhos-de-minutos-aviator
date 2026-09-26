@@ -159,8 +159,8 @@ async function startServer() {
     const newItems: StoredCandle[] = [];
     const count = parsedNumbers.length;
 
-    // Calibração Oficial Spribe (Betão & 973):
-    // Cada rodada do Aviator tem duração proporcional ao multiplicador:
+    // Calibração Oficial Spribe (82b.game):
+    // Cada rodada do Aviator no 82b.game tem duração proporcional ao multiplicador:
     // t_voo = max(0.6, ln(multiplier) / 0.06) + 5.0s (janela de aposta oficial)
     const getSpribeDurationSec = (mult: number): number => {
       if (mult <= 1.0) return 5.6;

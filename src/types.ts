@@ -51,7 +51,7 @@ export interface SuperPinkAnalysis {
   predictedMinutes: number[];
   criticalThreshold: number;
   recommendedStrategy: string;
-  platformCalibration: 'BETAO' | '973' | 'SPRIBE_AUTO';
+  platformCalibration: '82B_GAME' | 'SPRIBE_AUTO';
 }
 
 export interface RadarSignal {
@@ -67,7 +67,7 @@ export interface RadarSignal {
   timestamp: number;
   suggestedCashout: number;
   secondaryCashout?: number; // Ex: 10x ou 50x no alvo duplo
-  calibrationPlatform?: 'BETAO' | '973' | 'SPRIBE_AUTO';
+  calibrationPlatform?: '82B_GAME' | 'SPRIBE_AUTO';
   isSuperPink50x?: boolean;
   payingMinuteTarget: string;
   targetSecond?: number;

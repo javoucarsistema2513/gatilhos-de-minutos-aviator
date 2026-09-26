@@ -50,8 +50,8 @@ interface FocusedSignalMonitorProps {
   statistics: CandleStatistics;
   currentSignal: RadarSignal;
   superPinkAnalysis?: SuperPinkAnalysis;
-  platformCalibration?: 'BETAO' | '973' | 'SPRIBE_AUTO';
-  onSelectPlatform?: (platform: 'BETAO' | '973' | 'SPRIBE_AUTO') => void;
+  platformCalibration?: '82B_GAME' | 'SPRIBE_AUTO';
+  onSelectPlatform?: (platform: '82B_GAME' | 'SPRIBE_AUTO') => void;
   onAddCandle: (multiplier: number) => void;
   onRemoveLastCandle: () => void;
   onOpenSyncModal: () => void;
@@ -69,7 +69,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
   statistics,
   currentSignal,
   superPinkAnalysis,
-  platformCalibration = 'BETAO',
+  platformCalibration = '82B_GAME',
   onSelectPlatform,
   onAddCandle,
   onRemoveLastCandle,
@@ -659,36 +659,36 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap">
-          {/* Platform Calibration Switcher (Betão vs 973) */}
+          {/* Platform Calibration Switcher (82b.game) */}
           <div className="flex items-center gap-1 rounded-xl bg-slate-950 p-1 border border-slate-800 shrink-0">
             <span className="text-[10px] font-bold text-slate-400 pl-1.5 hidden md:inline">
               Calibração:
             </span>
             <button
-              onClick={() => onSelectPlatform && onSelectPlatform('BETAO')}
+              onClick={() => onSelectPlatform && onSelectPlatform('82B_GAME')}
               className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-1 ${
-                platformCalibration === 'BETAO'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                platformCalibration === '82B_GAME'
+                  ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-md shadow-amber-500/20 font-black'
                   : 'text-slate-400 hover:text-white'
               }`}
-              title="Calibração oficial Spribe para o Betão (Betano)"
+              title="Calibração oficial Spribe Aviator baseada no site 82b.game"
             >
-              <span>Betão</span>
-              {platformCalibration === 'BETAO' && (
+              <span>82b.game</span>
+              {platformCalibration === '82B_GAME' && (
                 <span className="h-1.5 w-1.5 rounded-full bg-slate-950"></span>
               )}
             </button>
             <button
-              onClick={() => onSelectPlatform && onSelectPlatform('973')}
+              onClick={() => onSelectPlatform && onSelectPlatform('SPRIBE_AUTO')}
               className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-1 ${
-                platformCalibration === '973'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                platformCalibration === 'SPRIBE_AUTO'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black'
                   : 'text-slate-400 hover:text-white'
               }`}
-              title="Calibração oficial Spribe para o 973"
+              title="Calibração adaptativa automática Spribe para 82b.game"
             >
-              <span>973</span>
-              {platformCalibration === '973' && (
+              <span>82b Auto</span>
+              {platformCalibration === 'SPRIBE_AUTO' && (
                 <span className="h-1.5 w-1.5 rounded-full bg-slate-950"></span>
               )}
             </button>
@@ -940,7 +940,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
           </div>
 
           {/* ========================================================================= */}
-          {/* CARD 1.5: MONITOR DE SUPER ROSA 50X+ (CALIBRADO BETÃO / 973 / SPRIBE)     */}
+          {/* CARD 1.5: MONITOR DE SUPER ROSA 50X+ (CALIBRADO 82B.GAME / SPRIBE)        */}
           {/* ========================================================================= */}
           <div className="rounded-2xl sm:rounded-3xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-950 p-3 sm:p-4 shadow-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-amber-500/20 pb-2.5">
@@ -954,11 +954,11 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                       Radar de Super Rosa 50x+ a 100x+
                     </span>
                     <span className="rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[9px] font-black uppercase">
-                      {platformCalibration === '973' ? 'Calibração 973' : 'Calibração Betão'}
+                      Calibração 82b.game
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Termômetro de retenção de altas velas da Spribe
+                    Termômetro de retenção de altas velas Spribe no 82b.game
                   </p>
                 </div>
               </div>
@@ -1335,7 +1335,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                     </span>
                   </div>
                   <p className="text-[10px] text-pink-300/80 max-w-md mx-auto">
-                    ⚠️ <b>Calibrado Betão / 973:</b> A aposta 1 em 2.00x garante seu lucro se a mesa segurar na roxa intermediária!
+                    ⚠️ <b>Calibrado 82b.game:</b> A aposta 1 em 2.00x garante seu lucro se a mesa segurar na roxa intermediária!
                   </p>
                 </div>
               ) : (

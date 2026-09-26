@@ -12,8 +12,8 @@ import {
 } from '../types';
 
 /**
- * Calibração Oficial Spribe (Betão & 973):
- * Cada rodada do Aviator tem duração física proporcional ao multiplicador:
+ * Calibração Oficial 82b.game (Spribe Aviator):
+ * Cada rodada do Aviator no 82b.game tem duração física proporcional ao multiplicador:
  * t_voo = max(0.6, ln(multiplier) / 0.06) + 5.0s (janela de aposta oficial da Spribe)
  */
 export function calculateSpribeRoundDuration(multiplier: number): number {
@@ -24,22 +24,22 @@ export function calculateSpribeRoundDuration(multiplier: number): number {
 
 /**
  * Mapeador Cirúrgico de Velas Super Rosa (50x+ e 100x+)
- * Calibrado com o algoritmo de retenção e liberação do Betão e do 973.
+ * Calibrado com o algoritmo de retenção e liberação do site 82b.game.
  */
 export function analyzeSuperPink50x(
   candles: AviatorCandle[],
-  platform: 'BETAO' | '973' | 'SPRIBE_AUTO' = 'BETAO'
+  platform: '82B_GAME' | 'SPRIBE_AUTO' = '82B_GAME'
 ): SuperPinkAnalysis {
   const superPinkCandles = candles.filter((c) => c.multiplier >= 50.0);
   const superPinkIndex = candles.findIndex((c) => c.multiplier >= 50.0);
   const roundsSinceLastSuperPink = superPinkIndex !== -1 ? superPinkIndex : candles.length;
   const lastSuper = superPinkCandles[0] || null;
 
-  // No Spribe (Betão e 973), o ciclo médio de 50x+ varia entre 35 e 70 rodadas.
-  const criticalThreshold = platform === '973' ? 36 : 40;
+  // No 82b.game, o ciclo médio de 50x+ varia entre 35 e 65 rodadas.
+  const criticalThreshold = 38;
   const isInCriticalZone = roundsSinceLastSuperPink >= criticalThreshold;
 
-  // Análise de acúmulo de energia (retenção de banca):
+  // Análise de acúmulo de energia (retenção de banca no 82b.game):
   // Velas azuis baixas (< 1.60x) nos últimos 15 tiros aumentam drasticamente a probabilidade de 50x+
   const recent15 = candles.slice(0, 15);
   const lowBlues = recent15.filter((c) => c.multiplier < 1.60).length;
@@ -53,19 +53,19 @@ export function analyzeSuperPink50x(
   const currentMinute = new Date().getMinutes();
   const lastMin = lastSuper ? lastSuper.payingMinute : currentMinute;
 
-  // Minutos propícios no Spribe: Espelho (+5m, +10m, +15m) e minutos redondos
+  // Minutos propícios no 82b.game: Espelho (+5m, +10m, +12m) e minutos redondos
   const predictedMinutes = [
     (lastMin + 5) % 60,
     (lastMin + 10) % 60,
-    (currentMinute + 2) % 60,
-    (currentMinute + 5) % 60,
+    (lastMin + 12) % 60,
+    (currentMinute + 4) % 60,
   ];
 
   let recommendedStrategy =
-    'Mapeando ciclo de 50x+. Quando o radar disparar o gatilho, proteja a mão 1 em 2.00x e deixe a mão 2 subir para 50.00x+.';
+    'Mapeando ciclo de 50x+ no 82b.game. Quando o radar disparar o gatilho, proteja a mão 1 em 2.00x e deixe a mão 2 subir para 50.00x+.';
   if (isInCriticalZone) {
     recommendedStrategy =
-      '🚨 ZONA CRÍTICA 50X+: Retenção extrema no Betão/973! Entrada com Proteção Dupla (Mão 1: 2.00x | Mão 2: Alavancar até 50.00x+).';
+      '🚨 ZONA CRÍTICA 50X+: Retenção extrema no 82b.game! Entrada com Proteção Dupla (Mão 1: 2.00x | Mão 2: Alavancar até 50.00x+).';
   }
 
   return {
@@ -234,7 +234,7 @@ export function analyzePayingMinutes(candles: AviatorCandle[]): PayingMinuteAnal
 
 export function evaluateLiveSignal(
   candles: AviatorCandle[],
-  platform: 'BETAO' | '973' | 'SPRIBE_AUTO' = 'BETAO',
+  platform: '82B_GAME' | 'SPRIBE_AUTO' = '82B_GAME',
   entryOffsetSeconds: number = 0
 ): RadarSignal {
   if (candles.length < 3) {

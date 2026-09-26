@@ -218,20 +218,20 @@ export const TableSynchronizerModal: React.FC<TableSynchronizerModalProps> = ({
               <button
                 type="button"
                 onClick={() =>
-                  handleLoadSample('1.15 1.05 2.14 1.30 1.25 15.40 2.20 1.10 3.80 1.95 2.60 1.18 54.20 2.30 1.35 1.08 1.45 2.05')
+                  handleLoadSample('1.15 1.05 2.14 1.30 1.25 15.40 2.20 1.10 3.80 1.95 2.60 1.18 64.50 2.30 1.35 1.08 1.45 2.05')
                 }
                 className="rounded-md border border-amber-500/40 bg-amber-950/30 px-2 py-1 text-[11px] font-bold text-amber-300 hover:bg-amber-900/50 transition"
               >
-                Betão (com 54.20x)
+                82b.game (com 64.50x)
               </button>
               <button
                 type="button"
                 onClick={() =>
-                  handleLoadSample('1.02 1.18 1.25 1.10 12.80 2.15 1.05 1.40 1.32 1.15 82.50 2.45 1.20 3.50 1.90 1.12')
+                  handleLoadSample('1.02 1.18 1.25 1.10 18.90 2.15 1.05 1.40 1.32 1.15 28.50 2.45 1.20 3.50 1.90 1.12')
                 }
                 className="rounded-md border border-emerald-500/40 bg-emerald-950/30 px-2 py-1 text-[11px] font-bold text-emerald-300 hover:bg-emerald-900/50 transition"
               >
-                973 (com 82.50x)
+                82b.game (com 18.90x)
               </button>
               <button
                 type="button"

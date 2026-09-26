@@ -1,6 +1,6 @@
 {
-  "name": "AeroCalc - Cálculos de Aviação em Tempo Real",
-  "description": "Calculadora e analisador de minutagem do Aviator em tempo real com projeção de velas rosas, padrões de minutos e gestão de banca, além de computador de voo e minutagem de diário de bordo (CIV).",
-  "requestFramePermissions": [],
+  "name": "Aviator Radar PWA",
+  "description": "Radar e calculadora cirúrgica de velas rosa e roxa no Aviator e entradas em Slots Assertivos (Fortune Tiger, Rabbit, Ox, Olympus) em tempo real com avisos sonoros, voz e notificações.",
+  "requestFramePermissions": ["notifications"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

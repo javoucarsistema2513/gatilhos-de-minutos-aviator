@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export interface BeforeInstallPromptEvent extends Event {
+interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
@@ -9,29 +9,18 @@ export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [platformName, setPlatformName] = useState<'ios' | 'android' | 'desktop'>('desktop');
 
   useEffect(() => {
-    // Detect standalone mode (already installed on homescreen / app window)
+    // Detect standalone mode (already installed)
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
-      document.referrer.includes('android-app://');
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     setIsInstalled(isStandalone);
 
-    // Detect platform
+    // Detect iOS devices
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
-    const isAndroidDevice = /android/.test(userAgent);
     setIsIOS(isIOSDevice);
-
-    if (isIOSDevice) {
-      setPlatformName('ios');
-    } else if (isAndroidDevice) {
-      setPlatformName('android');
-    } else {
-      setPlatformName('desktop');
-    }
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -52,18 +41,14 @@ export function usePWAInstall() {
     };
   }, []);
 
-  const install = async (): Promise<boolean> => {
+  const install = async () => {
     if (!deferredPrompt) return false;
-    try {
-      await deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setIsInstalled(true);
-        setDeferredPrompt(null);
-        return true;
-      }
-    } catch (err) {
-      console.warn('PWA install error:', err);
+    await deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+      return true;
     }
     return false;
   };
@@ -72,7 +57,6 @@ export function usePWAInstall() {
     isInstallable: !!deferredPrompt,
     isInstalled,
     isIOS,
-    platformName,
     install,
   };
 }
