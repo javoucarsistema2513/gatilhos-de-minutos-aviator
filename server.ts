@@ -11,52 +11,34 @@ interface StoredCandle {
   payingMinute: number;
 }
 
-// Initial realistic seed history of recent Aviator candles
-let candlesHistory: StoredCandle[] = [
-  { id: '1', multiplier: 1.22, timestamp: Date.now() - 1000 * 20 * 19, color: 'blue' as const, roundNumber: 101, payingMinute: 10 },
-  { id: '2', multiplier: 12.45, timestamp: Date.now() - 1000 * 20 * 18, color: 'pink' as const, roundNumber: 102, payingMinute: 11 },
-  { id: '3', multiplier: 2.14, timestamp: Date.now() - 1000 * 20 * 17, color: 'purple' as const, roundNumber: 103, payingMinute: 11 },
-  { id: '4', multiplier: 1.40, timestamp: Date.now() - 1000 * 20 * 16, color: 'blue' as const, roundNumber: 104, payingMinute: 12 },
-  { id: '5', multiplier: 3.82, timestamp: Date.now() - 1000 * 20 * 15, color: 'purple' as const, roundNumber: 105, payingMinute: 12 },
-  { id: '6', multiplier: 1.15, timestamp: Date.now() - 1000 * 20 * 14, color: 'blue' as const, roundNumber: 106, payingMinute: 13 },
-  { id: '7', multiplier: 1.95, timestamp: Date.now() - 1000 * 20 * 13, color: 'blue' as const, roundNumber: 107, payingMinute: 13 },
-  { id: '8', multiplier: 4.10, timestamp: Date.now() - 1000 * 20 * 12, color: 'purple' as const, roundNumber: 108, payingMinute: 14 },
-  { id: '9', multiplier: 1.05, timestamp: Date.now() - 1000 * 20 * 11, color: 'blue' as const, roundNumber: 109, payingMinute: 14 },
-  { id: '10', multiplier: 2.50, timestamp: Date.now() - 1000 * 20 * 10, color: 'purple' as const, roundNumber: 110, payingMinute: 15 },
-  { id: '11', multiplier: 1.83, timestamp: Date.now() - 1000 * 20 * 9, color: 'blue' as const, roundNumber: 111, payingMinute: 15 },
-  { id: '12', multiplier: 1.34, timestamp: Date.now() - 1000 * 20 * 8, color: 'blue' as const, roundNumber: 112, payingMinute: 16 },
-  { id: '13', multiplier: 6.20, timestamp: Date.now() - 1000 * 20 * 7, color: 'purple' as const, roundNumber: 113, payingMinute: 16 },
-  { id: '14', multiplier: 1.11, timestamp: Date.now() - 1000 * 20 * 6, color: 'blue' as const, roundNumber: 114, payingMinute: 17 },
-  { id: '15', multiplier: 1.48, timestamp: Date.now() - 1000 * 20 * 5, color: 'blue' as const, roundNumber: 115, payingMinute: 17 },
-  { id: '16', multiplier: 1.29, timestamp: Date.now() - 1000 * 20 * 4, color: 'blue' as const, roundNumber: 116, payingMinute: 18 },
-  { id: '17', multiplier: 18.90, timestamp: Date.now() - 1000 * 20 * 3, color: 'pink' as const, roundNumber: 117, payingMinute: 18 },
-  { id: '18', multiplier: 2.05, timestamp: Date.now() - 1000 * 20 * 2, color: 'purple' as const, roundNumber: 118, payingMinute: 19 },
-  { id: '19', multiplier: 1.35, timestamp: Date.now() - 1000 * 20 * 1, color: 'blue' as const, roundNumber: 119, payingMinute: 19 },
-  { id: '20', multiplier: 2.45, timestamp: Date.now(), color: 'purple' as const, roundNumber: 120, payingMinute: 20 },
-].reverse(); // Sort most recent first
+function createSeedCandles(): StoredCandle[] {
+  const now = Date.now();
+  const sampleMultipliers = [
+    2.45, 1.34, 1.15, 14.80, 2.10, 1.05, 3.82, 1.95, 4.10, 1.22,
+    18.90, 2.05, 1.35, 1.20, 5.40, 1.12, 2.65, 1.48, 1.29, 2.20
+  ];
+  return sampleMultipliers.map((mult, idx) => {
+    const ts = now - idx * 22000;
+    const color: 'blue' | 'purple' | 'pink' = mult >= 10 ? 'pink' : mult >= 2 ? 'purple' : 'blue';
+    return {
+      id: `seed-${idx}`,
+      multiplier: mult,
+      timestamp: ts,
+      color,
+      roundNumber: 150 - idx,
+      payingMinute: new Date(ts).getMinutes(),
+    };
+  });
+}
 
-let roundCounter = 120;
+let candlesHistory: StoredCandle[] = createSeedCandles();
+let roundCounter = 150;
 
 function getOrCalibrateCandles(): StoredCandle[] {
   const now = Date.now();
   if (candlesHistory.length === 0) {
-    const sampleMultipliers = [
-      2.45, 1.34, 1.15, 14.80, 2.10, 1.05, 3.82, 1.95, 4.10, 1.22,
-      18.90, 2.05, 1.35, 1.20, 5.40, 1.12, 2.65, 1.48, 1.29, 2.20
-    ];
-    candlesHistory = sampleMultipliers.map((mult, idx) => {
-      const ts = now - idx * 22000;
-      const color: 'blue' | 'purple' | 'pink' = mult >= 10 ? 'pink' : mult >= 2 ? 'purple' : 'blue';
-      return {
-        id: `seed-${idx}`,
-        multiplier: mult,
-        timestamp: ts,
-        color,
-        roundNumber: 150 - idx,
-        payingMinute: new Date(ts).getMinutes(),
-      };
-    });
-  } else if (now - candlesHistory[0].timestamp > 10 * 60 * 1000) {
+    candlesHistory = createSeedCandles();
+  } else if (now - candlesHistory[0].timestamp > 2 * 60 * 1000) {
     // Keep seed in sync with live clock if it has been sitting in past
     const shift = now - 20000 - candlesHistory[0].timestamp;
     candlesHistory = candlesHistory.map((c) => {

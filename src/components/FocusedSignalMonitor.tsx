@@ -271,8 +271,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
 
   // Filter surgical targets according to filterMode (AUTO, SUPER_PINK_50X, PINK_ONLY, PURPLE_ONLY)
   const relevantTargets = useMemo(() => {
+    // Include targets from -60s (active shooting minute) up to 20 minutes ahead
     const validTargets = targets.filter(
-      (t) => t.secondsRemaining >= -10 && t.secondsRemaining <= 600
+      (t) => t.secondsRemaining >= -60 && t.secondsRemaining <= 1200
     );
 
     if (filterMode === 'SUPER_PINK_50X') {
@@ -299,7 +300,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
       return purples.length > 0 ? purples : validTargets;
     }
 
-    // AUTO MODE: smart selection based on upcoming timeline
+    // AUTO MODE: Smart selection based on upcoming timeline
     return validTargets;
   }, [targets, filterMode]);
 
@@ -308,11 +309,27 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     if (relevantTargets.length === 0) return null;
 
     const sorted = [...relevantTargets].sort((a, b) => {
-      const aShooting = a.secondsRemaining >= -10 && a.secondsRemaining <= 0;
-      const bShooting = b.secondsRemaining >= -10 && b.secondsRemaining <= 0;
+      // 1. Target currently in ACTIVE_SHOOTING (0 to -60s) takes highest priority!
+      const aShooting = a.secondsRemaining <= 0 && a.secondsRemaining >= -60;
+      const bShooting = b.secondsRemaining <= 0 && b.secondsRemaining >= -60;
       if (aShooting && !bShooting) return -1;
       if (bShooting && !aShooting) return 1;
 
+      // 2. Target in PREPARE zone (1 to 45s)
+      const aPrep = a.secondsRemaining > 0 && a.secondsRemaining <= 45;
+      const bPrep = b.secondsRemaining > 0 && b.secondsRemaining <= 45;
+      if (aPrep && !bPrep) return -1;
+      if (bPrep && !aPrep) return 1;
+
+      // 3. In AUTO mode: Pink targets take priority if within 90 seconds
+      if (filterMode === 'AUTO') {
+        const aPinkClose = a.targetColor === 'pink' && a.secondsRemaining <= 90 && a.secondsRemaining >= -60;
+        const bPinkClose = b.targetColor === 'pink' && b.secondsRemaining <= 90 && b.secondsRemaining >= -60;
+        if (aPinkClose && !bPinkClose) return -1;
+        if (bPinkClose && !aPinkClose) return 1;
+      }
+
+      // 4. Positive seconds remaining before negative expired ones
       if (a.secondsRemaining >= 0 && b.secondsRemaining < 0) return -1;
       if (b.secondsRemaining >= 0 && a.secondsRemaining < 0) return 1;
 
@@ -320,7 +337,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     });
 
     return sorted[0];
-  }, [relevantTargets]);
+  }, [relevantTargets, filterMode]);
 
   // Guaranteed active target that is NEVER null, strictly following 4m/5m (purple) and 12m (pink) minutagem
   const activeTarget = useMemo((): SurgicalTarget => {
@@ -328,35 +345,38 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
 
     const now = new Date(currentTime);
     const curMin = now.getMinutes();
-    const secTarget = lastCandle ? new Date(lastCandle.timestamp).getSeconds() : 18;
+    const anchorSec = lastCandle ? new Date(lastCandle.timestamp).getSeconds() : 18;
+    const anchorMin = lastCandle ? lastCandle.payingMinute : curMin;
 
     const isSuper = filterMode === 'SUPER_PINK_50X';
     const isPink = !isSuper && (filterMode === 'PINK_ONLY' || (filterMode === 'AUTO' && isLastCandlePink));
     const targetColor: 'purple' | 'pink' = isPink || isSuper ? 'pink' : 'purple';
 
-    // Strictly respect 12m for pink and 4m for purple
+    // Strictly respect 12m for pink and 4m for purple from anchor candle
     const patternInterval: MinutePatternInterval = isPink || isSuper ? 12 : 4;
-    const targetMin = (curMin + (isPink || isSuper ? 12 : 4)) % 60;
-    const targetTimestamp = currentTime + patternInterval * 60 * 1000 + entryOffset * 1000;
+    const targetMin = (anchorMin + patternInterval) % 60;
+    let minDiff = (targetMin - curMin + 60) % 60;
+    if (minDiff === 0 && now.getSeconds() > 55) minDiff = patternInterval;
+    const targetTimestamp = currentTime + minDiff * 60 * 1000 - now.getSeconds() * 1000 + entryOffset * 1000;
     const diff = Math.round((targetTimestamp - currentTime) / 1000);
 
-    const secStr = String(secTarget).padStart(2, '0');
+    const secStr = String(anchorSec).padStart(2, '0');
     return {
-      id: `live-active-${targetMin}-${secTarget}`,
+      id: `live-active-${targetMin}-${anchorSec}`,
       interval: patternInterval,
       targetColor,
       isSuperPink50x: isSuper,
       sourceCandleId: lastCandle?.id || 'live-anchor',
       sourceMultiplier: lastCandle?.multiplier || (isPink ? 12.5 : 2.5),
       sourceTimestamp: lastCandle?.timestamp || currentTime,
-      sourceMinute: lastCandle?.payingMinute || curMin,
+      sourceMinute: anchorMin,
       targetMinute: targetMin,
-      targetSecond: secTarget,
+      targetSecond: anchorSec,
       targetTimestamp,
       targetTimeFormatted: `:${String(targetMin).padStart(2, '0')}`,
-      secondWindow: `:${String((secTarget - 5 + 60) % 60).padStart(2, '0')}s a :${String((secTarget + 15) % 60).padStart(2, '0')}s`,
+      secondWindow: `1ª Rodada: :05s a :25s • 2ª Rodada: :28s a :52s`,
       secondsRemaining: diff,
-      status: diff > 35 ? 'WAITING' : diff > 0 ? 'PREPARE' : 'ACTIVE_SHOOTING',
+      status: diff <= 0 && diff >= -60 ? 'ACTIVE_SHOOTING' : diff <= 35 ? 'PREPARE' : 'WAITING',
       confidence: isSuper ? 94 : isPink ? 92 : 88,
       targetMultiplier: isSuper
         ? '50.00x+ (Super Rosa | Minutagem +12M)'
@@ -364,14 +384,14 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
         ? '10.00x+ (Vela Rosa | Minutagem +12M)'
         : '2.00x a 3.50x (1ª Entrada Roxa +4M)',
       protectionGale: isSuper
-        ? `Super Rosa 50x+ aos :${secStr}s (Mão 1: 2.00x | Mão 2: 50.00x+)`
+        ? `Super Rosa no minuto :${String(targetMin).padStart(2, '0')} (Mão 1: 2.00x | Mão 2: 50.00x+)`
         : isPink
-        ? `Alvo Rosa aos :${secStr}s (Mão 1: 2.00x | Mão 2: 10.00x+)`
-        : `Disparo aos :${secStr}s com proteção em 2.00x (Aguarde a rodada certa)`,
+        ? `Alvo Rosa no minuto :${String(targetMin).padStart(2, '0')} (Mão 1: 2.00x proteção | Mão 2: 10.00x+)`
+        : `Entrada no minuto :${String(targetMin).padStart(2, '0')} com proteção em 2.00x`,
       hasConfluence: false,
       houseRuleTip: isPink
         ? 'Padrão 82b.game: Vela Rosa (+12m) com proteção de Mão 1 em 2.00x.'
-        : 'Padrão 82b.game: Vela Roxa (+4m) com saque em 2.00x.',
+        : 'Padrão 82b.game: Vela Roxa (+4m) com saque seguro em 2.00x.',
     };
   }, [
     nextTarget,
@@ -400,22 +420,18 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
   const isSuperPinkUpcoming = useMemo(() => {
     if (filterMode === 'SUPER_PINK_50X') return true;
     if (filterMode === 'PURPLE_ONLY') return false;
-    if (activeTarget.isSuperPink50x) return true;
-    if (activeTarget.targetColor === 'pink' && (activeTarget.sourceMultiplier >= 50.0 || activeTarget.targetMultiplier.includes('50.00x'))) {
-      return true;
-    }
-    if (currentSignal.type === 'SUPER_PINK_50X') return true;
-    return false;
+    return !!(
+      activeTarget.isSuperPink50x ||
+      (activeTarget.targetColor === 'pink' && (activeTarget.sourceMultiplier >= 50.0 || activeTarget.targetMultiplier.includes('50.00x'))) ||
+      currentSignal.type === 'SUPER_PINK_50X'
+    );
   }, [filterMode, activeTarget, currentSignal.type]);
 
   const isPinkUpcoming = useMemo(() => {
     if (isSuperPinkUpcoming) return false;
-    if (filterMode === 'PINK_ONLY') return true;
     if (filterMode === 'PURPLE_ONLY') return false;
-    // Strict adherence to targetColor:
-    if (activeTarget.targetColor === 'pink') return true;
-    if (activeTarget.targetColor === 'purple') return false;
-    return activeTarget.interval === 12;
+    if (filterMode === 'PINK_ONLY') return true;
+    return activeTarget.targetColor === 'pink' || activeTarget.interval === 12;
   }, [isSuperPinkUpcoming, filterMode, activeTarget]);
 
   const isPurpleUpcoming = useMemo(() => {
@@ -486,30 +502,24 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     if (voiceAnnounceEnabled && sec === 30 && lastVoiceStepRef.current !== `${activeTarget.id}-30`) {
       lastVoiceStepRef.current = `${activeTarget.id}-30`;
       if (isSuper) {
-        speakExactSecondsAlert(`Atenção: Minutagem de Super Rosa em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Aguarde a rodada certa!`);
+        speakExactSecondsAlert(`Atenção: Minutagem de Super Rosa em 30 segundos no minuto ${targetMinute}! Prepare a proteção em 2x!`);
       } else if (isPink) {
-        speakExactSecondsAlert(`Atenção: Minutagem de 12 minutos da Vela Rosa em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Não aposte na rodada anterior!`);
+        speakExactSecondsAlert(`Atenção: Minutagem de 12 minutos da Vela Rosa se aproximando no minuto ${targetMinute}! Prepare Mão 1 com proteção em 2x!`);
       } else {
-        speakExactSecondsAlert(`Atenção: Minutagem da Vela Roxa em 30 segundos! Minuto ${targetMinute}, segundo ${targetSecondStr}! Não aposte na rodada anterior!`);
+        speakExactSecondsAlert(`Atenção: Minutagem da Vela Roxa em 30 segundos no minuto ${targetMinute}! Prepare o saque em 2x!`);
       }
     }
 
     // 15 seconds remaining warning
     if (voiceAnnounceEnabled && sec === 15 && lastVoiceStepRef.current !== `${activeTarget.id}-15`) {
       lastVoiceStepRef.current = `${activeTarget.id}-15`;
-      if (isSuper) {
-        speakExactSecondsAlert(`15 segundos para Super Rosa! Aguarde o segundo ${targetSecondStr} da rodada certa!`);
-      } else if (isPink) {
-        speakExactSecondsAlert(`15 segundos para Vela Rosa 12 minutos! Disparo no segundo ${targetSecondStr}! Aguarde a rodada certa!`);
-      } else {
-        speakExactSecondsAlert(`15 segundos para Vela Roxa! Não aposte na rodada anterior! Disparo no segundo ${targetSecondStr}!`);
-      }
+      speakExactSecondsAlert(`15 segundos para o minuto ${targetMinute}! Prepare a entrada na ${candleTypeLabel}!`);
     }
 
     // 5 seconds remaining warning
     if (voiceAnnounceEnabled && sec === 5 && lastVoiceStepRef.current !== `${activeTarget.id}-5`) {
       lastVoiceStepRef.current = `${activeTarget.id}-5`;
-      speakExactSecondsAlert(`5 segundos! Prepara entrada na ${candleTypeLabel}!`);
+      speakExactSecondsAlert(`5 segundos! Prepare o botão para a 1ª rodada do minuto ${targetMinute}!`);
     }
 
     // Precision ascending beeps on seconds 5, 4, 3, 2, 1
@@ -526,11 +536,11 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
       playTriggerNowSound();
       if (voiceAnnounceEnabled) {
         if (isSuper) {
-          speakExactSecondsAlert(`Tiro agora no segundo ${targetSecondStr}! Entra na Super Rosa 50x mais!`);
+          speakExactSecondsAlert(`Minuto ${targetMinute} liberado agora! Entra na Super Rosa com proteção em 2x!`);
         } else if (isPink) {
-          speakExactSecondsAlert(`Tiro agora no segundo ${targetSecondStr}! Entra na Vela Rosa 12 minutos! Proteção em 2x!`);
+          speakExactSecondsAlert(`Minuto ${targetMinute} liberado agora! Entra na Vela Rosa com proteção em 2x na Mão 1!`);
         } else {
-          speakExactSecondsAlert(`Tiro agora no segundo ${targetSecondStr}! Entra na Vela Roxa, saque em 2.00x!`);
+          speakExactSecondsAlert(`Minuto ${targetMinute} liberado agora! Entra na Vela Roxa com saque em 2x!`);
         }
       }
     }
@@ -553,8 +563,8 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
   const currentSecondInMinute = new Date(currentTime).getSeconds();
 
   // Status computation
-  const isShootingActive = secondsLeft <= 0 && secondsLeft >= -10;
-  const isPreparing = secondsLeft > 0 && secondsLeft <= 35;
+  const isShootingActive = secondsLeft <= 0 && secondsLeft >= -60;
+  const isPreparing = secondsLeft > 0 && secondsLeft <= 45;
   const isCriticalCountdown = secondsLeft > 0 && secondsLeft <= 10;
 
   // Quick candle form submit
@@ -1332,19 +1342,19 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                   </span>
                 </div>
 
-                {/* Col 2: EXACT ENTRY SECOND */}
+                {/* Col 2: EXACT ENTRY SECOND & ROUND WINDOW */}
                 <div className="space-y-1 sm:border-r border-slate-800/80 sm:px-2 bg-slate-900/50 sm:bg-transparent rounded-lg p-1.5 sm:p-0">
                   <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1 text-emerald-400">
                     <Crosshair className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
-                    <span>Segundo</span>
+                    <span>Rodadas do Minuto</span>
                   </span>
                   <div className="flex items-baseline">
-                    <span className="font-mono text-2xl sm:text-3xl font-black text-emerald-400">
-                      :{targetSecondStr}s
+                    <span className="font-mono text-xl sm:text-2xl font-black text-emerald-400">
+                      :{targetSecondStr}s <span className="text-xs text-emerald-300 font-semibold">(Ref)</span>
                     </span>
                   </div>
                   <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-300 block">
-                    Janela {secondWindow}
+                    {secondWindow}
                   </span>
                 </div>
 
@@ -1356,12 +1366,12 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                       <span>Contagem</span>
                     </span>
                     <span className="text-[10px] sm:text-[11px] text-slate-400 font-semibold block sm:hidden">
-                      {isShootingActive ? '🎯 Entrada Liberada' : `Faltam ${Math.max(0, secondsLeft)}s`}
+                      {isShootingActive ? `🎯 Minuto :${targetMinute} Ativo` : `Faltam ${Math.max(0, secondsLeft)}s`}
                     </span>
                   </div>
                   <div className="text-right">
                     <span
-                      className={`font-mono text-2xl sm:text-3xl font-black ${
+                      className={`font-mono text-xl sm:text-3xl font-black ${
                         isShootingActive
                           ? 'text-emerald-400 animate-pulse'
                           : isCriticalCountdown
@@ -1371,10 +1381,10 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                           : 'text-white'
                       }`}
                     >
-                      {isShootingActive ? 'AGORA!' : formatCountdown(Math.max(0, secondsLeft))}
+                      {isShootingActive ? `ATIVO! (:${String(currentSecondInMinute).padStart(2, '0')}s)` : formatCountdown(Math.max(0, secondsLeft))}
                     </span>
                     <span className="text-[10px] text-slate-400 font-semibold hidden sm:block">
-                      {isShootingActive ? '🎯 Aberta' : `${Math.max(0, secondsLeft)}s restantes`}
+                      {isShootingActive ? `Minuto :${targetMinute} em andamento` : `${Math.max(0, secondsLeft)}s restantes`}
                     </span>
                   </div>
                 </div>
@@ -1384,9 +1394,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
             {/* Visual Seconds Progress Ruler (60 seconds cycle) */}
             <div className="mt-3 rounded-xl bg-slate-950/70 border border-slate-800/80 p-2.5 space-y-1.5">
               <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-400 font-semibold">
-                <span>Segundo Atual: <b className="text-white font-mono">:{String(currentSecondInMinute).padStart(2, '0')}s</b></span>
+                <span>Segundo Atual da Mesa: <b className="text-white font-mono">:{String(currentSecondInMinute).padStart(2, '0')}s</b></span>
                 <span className="text-emerald-400 font-black">
-                  🎯 Disparo no segundo: <b className="font-mono">:{targetSecondStr}s</b>
+                  🎯 Entrada no Minuto: <b className="font-mono">:{targetMinute}</b> (Ref :${targetSecondStr}s)
                 </span>
               </div>
 
@@ -1401,7 +1411,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                 <div
                   className="absolute top-0 bottom-0 w-1.5 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,1)] z-10"
                   style={{ left: `calc(${(targetSecond / 60) * 100}% - 3px)` }}
-                  title={`Segundo do Tiro: :${targetSecondStr}s`}
+                  title={`Segundo de Referência: :${targetSecondStr}s`}
                 />
               </div>
 
@@ -1417,19 +1427,21 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
             {/* DYNAMIC SECOND-BY-SECOND CRITICAL STATUS BANNERS */}
             <div className="mt-3">
               {isShootingActive ? (
-                /* Disparo ativado no segundo exato */
-                <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-3 sm:p-3.5 text-slate-950 font-black text-center shadow-lg shadow-emerald-500/40 animate-bounce">
+                /* Disparo ativado durante o minuto inteiro */
+                <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-3 sm:p-3.5 text-slate-950 font-black text-center shadow-lg shadow-emerald-500/40 animate-pulse">
                   <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-base">
                     <CheckCircle2 className="w-5 h-5 shrink-0" />
-                    <span>🎯 SEGUNDO EXATO ATINGIDO (:{targetSecondStr}s)! ENTRAR AGORA!</span>
+                    <span>🎯 MINUTO PAGANTE :{targetMinute} ATIVO! ENTRADA LIBERADA AGORA!</span>
                   </div>
                   <p className="text-xs font-bold text-slate-900 mt-0.5">
-                    Aposta aberta no Aviator •{' '}
                     {isSuperPinkUpcoming
-                      ? 'Mão 1: Saque 2.00x | Mão 2: Deixar subir para 50.00x+'
+                      ? '👑 Super Rosa 50x+ • Mão 1: Saque 2.00x de proteção | Mão 2: Deixar subir para 50.00x+'
                       : isPinkUpcoming
-                      ? 'Mão 1: Saque Proteção 2.00x | Mão 2: Buscar 10.00x+'
-                      : 'Saque programado em 2.00x'}
+                      ? '🌸 Alvo Vela Rosa 10x+ • Mão 1: Saque em 2.00x (Protege contra roxa) | Mão 2: Buscar 10.00x+'
+                      : '🟣 Alvo Vela Roxa • Saque automático garantido em 2.00x na Mão 1'}
+                  </p>
+                  <p className="text-[11px] text-slate-900/80 mt-0.5 font-semibold">
+                    Janela das Rodadas: 1ª Rodada (:05s a :25s) • 2ª Rodada / Gale (:28s a :52s)
                   </p>
                 </div>
               ) : secondsLeft <= 5 && secondsLeft > 0 ? (
@@ -1437,10 +1449,10 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                 <div className="rounded-2xl bg-rose-600/30 border-2 border-rose-500 p-3 text-center shadow-lg shadow-rose-600/30 animate-pulse">
                   <div className="flex items-center justify-center gap-2 text-rose-300 font-black text-xs sm:text-sm uppercase">
                     <BellRing className="w-5 h-5 text-rose-400 animate-bounce shrink-0" />
-                    <span>🚨 CONTAGEM FINAL: {secondsLeft} SEGUNDOS PARA O TIRO!</span>
+                    <span>🚨 CONTAGEM FINAL: {secondsLeft} SEGUNDOS PARA O MINUTO :{targetMinute}!</span>
                   </div>
                   <div className="font-mono text-xl sm:text-2xl font-black text-white mt-1">
-                    DISPARO NO SEGUNDO :{targetSecondStr}s (
+                    ABERTURA NO MINUTO :{targetMinute} (
                     {isSuperPinkUpcoming
                       ? '👑 SUPER ROSA 50X+'
                       : isPinkUpcoming
@@ -1449,15 +1461,15 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                     )
                   </div>
                   <p className="text-[11px] font-bold text-rose-200 mt-0.5">
-                    Mão no botão de aposta! Beep e voz ativos.
+                    Mão no botão de aposta! Entrar na 1ª rodada do minuto.
                   </p>
                 </div>
               ) : isPreparing ? (
-                /* Preparação quando faltam <= 35s */
+                /* Preparação quando faltam <= 45s */
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 rounded-2xl bg-amber-500/20 border border-amber-500/50 p-2.5 text-amber-300 text-xs font-black uppercase tracking-wide">
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 animate-spin shrink-0" />
-                    <span>PREPARAR APOSTA PARA O SEGUNDO :{targetSecondStr}s</span>
+                    <span>PREPARAR ENTRADA PARA O MINUTO :{targetMinute}</span>
                   </div>
                   <span className="font-mono font-bold bg-amber-500/30 px-2 py-0.5 rounded-lg shrink-0 text-center">
                     Faltam {secondsLeft}s
@@ -1468,7 +1480,7 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-2xl bg-slate-900 border border-slate-800 p-2 text-slate-400 font-bold text-xs">
                   <span>Aguardando aproximação do minuto :{targetMinute}</span>
                   <span className="font-mono text-[11px] text-slate-500">
-                    Disparo programado aos :{targetSecondStr}s
+                    Alvo cravado às {exactTargetTime}
                   </span>
                 </div>
               )}

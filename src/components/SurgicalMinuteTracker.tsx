@@ -461,19 +461,20 @@ export const SurgicalMinuteTracker: React.FC<SurgicalMinuteTrackerProps> = ({
                         </div>
                       </div>
 
-                      {/* Exact Entry Second */}
+                      {/* Exact Entry Second & Round Window */}
                       <div className="border-t sm:border-t-0 sm:border-x border-slate-800/80 pt-1.5 sm:pt-0 sm:px-2">
                         <span className="block text-[10px] font-black uppercase text-emerald-400 flex items-center gap-1">
                           <Crosshair className="w-3 h-3 text-emerald-400" />
-                          <span>Segundo Exato</span>
+                          <span>Rodadas da Casa</span>
                         </span>
                         <div className="flex items-baseline gap-1">
                           <span className="text-xl font-black text-emerald-400 font-mono">
                             :{String(target.targetSecond !== undefined ? target.targetSecond : 18).padStart(2, '0')}s
                           </span>
+                          <span className="text-[10px] text-emerald-300 font-semibold">(Ref)</span>
                         </div>
                         <span className="text-[9px] text-emerald-300/80 block truncate">
-                          {target.secondWindow || 'Janela :13s a :28s'}
+                          {target.secondWindow || '1ª Rodada: :05s a :25s • 2ª Rodada: :28s a :52s'}
                         </span>
                       </div>
 
@@ -491,8 +492,10 @@ export const SurgicalMinuteTracker: React.FC<SurgicalMinuteTrackerProps> = ({
                               : 'text-white'
                           }`}
                         >
-                          {target.secondsRemaining <= 0
-                            ? 'DISPARANDO'
+                          {target.secondsRemaining <= 0 && target.secondsRemaining >= -60
+                            ? '🎯 MINUTO ATIVO!'
+                            : target.secondsRemaining < -60
+                            ? 'ENCERRADO'
                             : `${Math.floor(target.secondsRemaining / 60)}m ${String(
                                 target.secondsRemaining % 60
                               ).padStart(2, '0')}s`}

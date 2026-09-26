@@ -257,9 +257,9 @@ export function evaluateLiveSignal(
 
   const { targets } = getUpcomingSurgicalTargets(candles, Date.now(), entryOffsetSeconds);
 
-  // Find the most urgent upcoming target in preparation or active shooting (<= 45s and >= -15s)
+  // Find the most urgent upcoming target in preparation or active shooting (<= 45s and >= -60s)
   const activeTarget = targets.find(
-    (t) => t.secondsRemaining <= 45 && t.secondsRemaining >= -15
+    (t) => t.secondsRemaining <= 45 && t.secondsRemaining >= -60
   );
 
   // If no target is in shooting/prepare zone, find the next upcoming minutagem target (> 0)
@@ -277,8 +277,8 @@ export function evaluateLiveSignal(
     nextTarget?.targetTimeFormatted ||
     new Date(Date.now() + 4 * 60000).toLocaleTimeString('pt-BR');
   const payingSecondTarget = nextTarget
-    ? `:${secStr}s (${nextTarget.secondWindow})`
-    : `:${secStr}s`;
+    ? `Janela :05s a :25s (1ª Rodada) • :28s a :52s (2ª Rodada) [Ref: :${secStr}s]`
+    : `Janela :05s a :25s • :28s a :52s`;
   const payingMinuteStr = `:${String(targetMinute).padStart(2, '0')}`;
 
   // =========================================================================
@@ -295,12 +295,12 @@ export function evaluateLiveSignal(
         ? '👑 ALERTA MÁXIMO: SUPER ROSA 50X+ (82B.GAME • +12M)'
         : '🌸 ALERTA MINUTAGEM: VELA ROSA 10X+ (82B.GAME • +12M)',
       targetMultiplier: isSuper
-        ? 'Alvo 50.00x+ (Mão 1: Saque 2.00x | Mão 2: 50.00x+)'
-        : 'Alvo Duplo: Mão 1 em 2.00x (Proteção) | Mão 2 em 10.00x+',
+        ? 'Alvo 50.00x+ (Mão 1: Saque 2.00x Proteção | Mão 2: 50.00x+)'
+        : 'Alvo Duplo: Mão 1 em 2.00x (Proteção de Banca) | Mão 2 em 10.00x+',
       confidence: Math.min(97, activeTarget.confidence + 5),
-      triggerReason: `Minutagem oficial de 12 minutos mapeada no 82b.game a partir da vela rosa de ${activeTarget.sourceMultiplier.toFixed(2)}x. Alinhamento calibrado da casa: entrada no segundo :${secStr}s do minuto :${String(targetMinute).padStart(2, '0')}. Mão 1 com saque automático em 2.00x (proteção da banca caso a casa pague roxa) e Mão 2 buscando 10.00x+.`,
+      triggerReason: `Minutagem oficial de 12 minutos (+12M) no 82b.game originada na vela de ${activeTarget.sourceMultiplier.toFixed(2)}x (minuto :${String(activeTarget.sourceMinute).padStart(2, '0')}). Alvo no minuto :${String(targetMinute).padStart(2, '0')} (1ª Rodada: :05s-:25s | 2ª Rodada: :28s-:52s). Regra da Casa: Mão 1 com saque em 2.00x para proteger a banca se vier roxa e Mão 2 buscando 10.00x+.`,
       stopGain: '10.00x',
-      protectionGale: `Disparo aos :${secStr}s (Mão 1: Saque 2.00x proteção | Mão 2: 10.00x+)`,
+      protectionGale: `Entrada no minuto :${String(targetMinute).padStart(2, '0')} (Mão 1: Saque 2.00x proteção | Mão 2: 10.00x+)`,
       timestamp: Date.now(),
       suggestedCashout: 2.0,
       secondaryCashout: isSuper ? 50.0 : 10.0,
@@ -327,12 +327,12 @@ export function evaluateLiveSignal(
         ? '🟣 ALERTA MINUTAGEM: VELA ROXA (+5M - 2ª ENTRADA / CONFIRMAÇÃO)'
         : '🟣 ALERTA MINUTAGEM: VELA ROXA (+4M - 1ª ENTRADA OFICIAL)',
       targetMultiplier: isSecondEntry
-        ? 'Buscar 2.00x com expansão até 5.00x'
+        ? 'Buscar 2.00x a 5.00x (Confirmação / Expansão)'
         : 'Buscar 2.00x (Saque de proteção na Mão 1)',
       confidence: activeTarget.confidence,
-      triggerReason: `Minutagem oficial de ${activeTarget.interval} minutos no 82b.game após a vela roxa de ${activeTarget.sourceMultiplier.toFixed(2)}x. Entrada cirúrgica no segundo :${secStr}s do minuto :${String(targetMinute).padStart(2, '0')}. Alvo: Vela Roxa (2.00x a 3.50x). Caso a casa pague rosa, o resultado é lucro ampliado.`,
+      triggerReason: `Minutagem oficial de +${activeTarget.interval}M no 82b.game originada na vela roxa de ${activeTarget.sourceMultiplier.toFixed(2)}x (minuto :${String(activeTarget.sourceMinute).padStart(2, '0')}). Alvo no minuto :${String(targetMinute).padStart(2, '0')}. Entrada nas rodadas do minuto (1ª Rodada: :05s-:25s | 2ª Rodada: :28s-:52s). Saque automático garantido em 2.00x.`,
       stopGain: '2.00x',
-      protectionGale: `Disparo aos :${secStr}s com saque seguro em 2.00x (Aguarde o segundo da rodada certa)`,
+      protectionGale: `Entrada no minuto :${String(targetMinute).padStart(2, '0')} com saque em 2.00x`,
       timestamp: Date.now(),
       suggestedCashout: 2.0,
       secondaryCashout: isSecondEntry ? 5.0 : 3.5,
@@ -362,10 +362,10 @@ export function evaluateLiveSignal(
     targetMultiplier: nextTarget?.targetMultiplier || 'Minutagem +4m/+5m (Roxa) | +12m (Rosa)',
     confidence: nextTarget?.confidence || 86,
     triggerReason: nextTarget
-      ? `Monitorando padrões da casa 82b.game (+4m/+5m para vela roxa | +12m para vela rosa). Próxima entrada: ${nextTargetName} no minuto :${String(targetMinute).padStart(2, '0')} aos :${secStr}s (${targetTimeFormatted}). Cálculos em tempo real ativos.`
+      ? `Monitorando padrões da casa 82b.game (+4m/+5m vela roxa | +12m vela rosa). Próxima entrada: ${nextTargetName} no minuto :${String(targetMinute).padStart(2, '0')} (Rodadas: :05s-:25s e :28s-:52s). Cálculos em tempo real ativos.`
       : 'Radar pronto no 82b.game. Monitorando saída de velas roxas (alvo +4m/+5m) e rosas (alvo +12m).',
     stopGain: '2.00x',
-    protectionGale: `Aguarde o segundo :${secStr}s da rodada certa (Não aposte na rodada anterior)`,
+    protectionGale: `Aguarde a abertura do minuto :${String(targetMinute).padStart(2, '0')} (Entrada na 1ª rodada do minuto)`,
     timestamp: Date.now(),
     suggestedCashout: 2.0,
     calibrationPlatform: platform,
@@ -550,26 +550,132 @@ export function getUpcomingSurgicalTargets(
 
   const eligiblePinks = candles
     .filter((c) => c.multiplier >= 10.0)
-    .slice(0, 5);
+    .slice(0, 6);
 
   const rawTargets: SurgicalTarget[] = [];
+  const addedKeys = new Set<string>();
 
-  // 1. Generate +4M and +5M targets for each purple candle (ALVO: ROXA)
+  // 1. Generate +4M and +5M targets for purple candles (ALVO: ROXA)
   eligiblePurples.forEach((source) => {
     const intervals: MinutePatternInterval[] = [4, 5];
+    const sourceSecond = new Date(source.timestamp).getSeconds();
     intervals.forEach((interval) => {
+      // Check cycle multiples (+4M/+5M, or +8M/+9M)
+      const cycleOffsets = [interval, interval + 4];
+      for (const offset of cycleOffsets) {
+        const targetTimestamp =
+          source.timestamp + offset * 60 * 1000 + entryOffsetSeconds * 1000;
+        const targetDate = new Date(targetTimestamp);
+        const targetMinute = (source.payingMinute + offset) % 60;
+        const targetSecond = sourceSecond;
+        const targetTimeFormatted = `${String(targetDate.getHours()).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`;
+        const secondWindow = `1ª Rodada: :05s a :25s • 2ª Rodada: :28s a :52s`;
+        const secondsRemaining = Math.round((targetTimestamp - currentTime) / 1000);
+
+        const key = `purple-${targetMinute}-${interval}`;
+        if (addedKeys.has(key)) continue;
+
+        let status: SurgicalTarget['status'] = 'WAITING';
+        let validationOutcome: SurgicalTarget['validationOutcome'] = undefined;
+        let validatedMultiplier: number | undefined = undefined;
+
+        if (secondsRemaining > 35) {
+          status = 'WAITING';
+        } else if (secondsRemaining > 0 && secondsRemaining <= 35) {
+          status = 'PREPARE';
+        } else if (secondsRemaining <= 0 && secondsRemaining >= -60) {
+          status = 'ACTIVE_SHOOTING';
+        } else {
+          const hitCandle = candles.find(
+            (c) =>
+              c.payingMinute === targetMinute &&
+              Math.abs(c.timestamp - targetTimestamp) <= 75 * 1000
+          );
+          if (hitCandle) {
+            validatedMultiplier = hitCandle.multiplier;
+            if (hitCandle.multiplier >= 10.0) {
+              status = 'VALIDATED_HIT';
+              validationOutcome = 'SUPERAVIT_PINK_ON_PURPLE';
+            } else if (hitCandle.multiplier >= 2.0) {
+              status = 'VALIDATED_HIT';
+              validationOutcome = 'EXACT_PURPLE_HIT';
+            } else {
+              status = 'EXPIRED_MISS';
+              validationOutcome = 'MISS_BLUE';
+            }
+          } else {
+            status = 'EXPIRED_MISS';
+            validationOutcome = 'MISS_BLUE';
+          }
+        }
+
+        if (secondsRemaining < -900) continue;
+
+        addedKeys.add(key);
+
+        const patternStat = statsMap.get(interval);
+        const confidence = patternStat ? patternStat.accuracyRate : interval === 4 ? 87 : 90;
+
+        rawTargets.push({
+          id: `surg-purple-${source.id}-${interval}-${offset}`,
+          interval,
+          targetColor: 'purple',
+          isSuperPink50x: false,
+          sourceCandleId: source.id,
+          sourceMultiplier: source.multiplier,
+          sourceTimestamp: source.timestamp,
+          sourceMinute: source.payingMinute,
+          targetMinute,
+          targetSecond,
+          targetTimestamp,
+          targetTimeFormatted,
+          secondWindow,
+          secondsRemaining,
+          status,
+          confidence,
+          targetMultiplier:
+            interval === 4
+              ? '2.00x a 3.50x (1ª Entrada Roxa +4M)'
+              : '2.00x a 5.00x (2ª Entrada / Gale +5M)',
+          protectionGale:
+            interval === 4
+              ? `Entrada no minuto :${String(targetMinute).padStart(2, '0')} (1ª Rodada: :05s-:25s | Saque em 2.00x)`
+              : `2ª Entrada / Gale no minuto :${String(targetMinute).padStart(2, '0')} (Saque 2.00x com expansão)`,
+          hasConfluence: false,
+          validationOutcome,
+          validatedMultiplier,
+          houseRuleTip:
+            interval === 4
+              ? 'Padrão 82b.game: 1ª Entrada Oficial após vela roxa. Saque seguro de proteção em 2.00x na Mão 1.'
+              : 'Padrão 82b.game: 2ª Entrada / Confirmação Roxa (+5m). Alvo 2.00x com expansão até 5.00x.',
+        });
+
+        if (secondsRemaining >= -60) break;
+      }
+    });
+  });
+
+  // 2. Generate +12M targets for pink candles (ALVO: ROSA)
+  eligiblePinks.forEach((source) => {
+    const interval: MinutePatternInterval = 12;
+    const sourceSecond = new Date(source.timestamp).getSeconds();
+    const isSuper = source.multiplier >= 50.0;
+    const cycleMultipliers = [1, 2, 3, 4];
+
+    for (const k of cycleMultipliers) {
+      const offsetMinutes = k * 12;
       const targetTimestamp =
-        source.timestamp + interval * 60 * 1000 + entryOffsetSeconds * 1000;
+        source.timestamp + offsetMinutes * 60 * 1000 + entryOffsetSeconds * 1000;
       const targetDate = new Date(targetTimestamp);
-      const targetMinute = targetDate.getMinutes();
-      const targetSecond = targetDate.getSeconds();
-      const targetTimeFormatted = targetDate.toLocaleTimeString('pt-BR');
-      const windowStartSec = (targetSecond - 5 + 60) % 60;
-      const windowEndSec = (targetSecond + 15) % 60;
-      const secondWindow = `:${String(windowStartSec).padStart(2, '0')}s a :${String(windowEndSec).padStart(2, '0')}s`;
+      const targetMinute = (source.payingMinute + offsetMinutes) % 60;
+      const targetSecond = sourceSecond;
+      const targetTimeFormatted = `${String(targetDate.getHours()).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`;
+      const secondWindow = `1ª Rodada: :05s a :25s • 2ª Rodada: :28s a :52s`;
       const secondsRemaining = Math.round((targetTimestamp - currentTime) / 1000);
 
-      // Determine Status & Validation against historical candles
+      const key = `pink-${targetMinute}`;
+      if (addedKeys.has(key)) continue;
+
       let status: SurgicalTarget['status'] = 'WAITING';
       let validationOutcome: SurgicalTarget['validationOutcome'] = undefined;
       let validatedMultiplier: number | undefined = undefined;
@@ -578,23 +684,22 @@ export function getUpcomingSurgicalTargets(
         status = 'WAITING';
       } else if (secondsRemaining > 0 && secondsRemaining <= 35) {
         status = 'PREPARE';
-      } else if (secondsRemaining <= 0 && secondsRemaining >= -15) {
+      } else if (secondsRemaining <= 0 && secondsRemaining >= -60) {
         status = 'ACTIVE_SHOOTING';
       } else {
-        // Validate against candles in the dataset
         const hitCandle = candles.find(
           (c) =>
             c.payingMinute === targetMinute &&
-            Math.abs(c.timestamp - targetTimestamp) <= 65 * 1000
+            Math.abs(c.timestamp - targetTimestamp) <= 75 * 1000
         );
         if (hitCandle) {
           validatedMultiplier = hitCandle.multiplier;
           if (hitCandle.multiplier >= 10.0) {
             status = 'VALIDATED_HIT';
-            validationOutcome = 'SUPERAVIT_PINK_ON_PURPLE'; // Pagou Rosa no alvo de Roxa!
+            validationOutcome = 'EXACT_PINK_HIT';
           } else if (hitCandle.multiplier >= 2.0) {
             status = 'VALIDATED_HIT';
-            validationOutcome = 'EXACT_PURPLE_HIT'; // Acerto exato de Roxa
+            validationOutcome = 'PROTECTION_PURPLE_ON_PINK';
           } else {
             status = 'EXPIRED_MISS';
             validationOutcome = 'MISS_BLUE';
@@ -605,15 +710,21 @@ export function getUpcomingSurgicalTargets(
         }
       }
 
+      if (secondsRemaining < -900) continue;
+
+      addedKeys.add(key);
+
       const patternStat = statsMap.get(interval);
-      const confidence = patternStat ? patternStat.accuracyRate : interval === 4 ? 87 : 90;
-      const secStr = String(targetSecond).padStart(2, '0');
+      let confidence = patternStat ? patternStat.accuracyRate : 92;
+      if (isSuper) {
+        confidence = Math.min(98, confidence + 5);
+      }
 
       rawTargets.push({
-        id: `surg-purple-${source.id}-${interval}`,
-        interval,
-        targetColor: 'purple',
-        isSuperPink50x: false,
+        id: `surg-pink-${source.id}-12-${k}`,
+        interval: 12,
+        targetColor: 'pink',
+        isSuperPink50x: isSuper,
         sourceCandleId: source.id,
         sourceMultiplier: source.multiplier,
         sourceTimestamp: source.timestamp,
@@ -626,203 +737,101 @@ export function getUpcomingSurgicalTargets(
         secondsRemaining,
         status,
         confidence,
-        targetMultiplier:
-          interval === 4
-            ? '2.00x a 3.50x (1ª Entrada Roxa +4M)'
-            : '2.00x a 5.00x (2ª Entrada / Gale +5M)',
-        protectionGale:
-          interval === 4
-            ? `Disparo aos :${secStr}s com saque seguro em 2.00x (Não aposte na rodada anterior)`
-            : `2ª Entrada aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: Expansão)`,
+        targetMultiplier: isSuper
+          ? '50.00x+ (Super Rosa | Minutagem +12M)'
+          : '10.00x+ (Vela Rosa | Minutagem +12M)',
+        protectionGale: isSuper
+          ? `Super Rosa no minuto :${String(targetMinute).padStart(2, '0')} (Mão 1: Saque 2.00x | Mão 2: 50.00x+)`
+          : `Alvo Rosa no minuto :${String(targetMinute).padStart(2, '0')} (Mão 1: Saque 2.00x proteção | Mão 2: 10.00x+)`,
         hasConfluence: false,
         validationOutcome,
         validatedMultiplier,
-        houseRuleTip:
-          interval === 4
-            ? 'Padrão 82b.game: 1ª Entrada Oficial após vela roxa. Saque seguro de proteção em 2.00x na Mão 1.'
-            : 'Padrão 82b.game: 2ª Entrada / Confirmação Roxa (+5m). Alvo 2.00x com expansão até 5.00x.',
+        houseRuleTip: isSuper
+          ? 'Padrão 82b.game: Ciclo Crítico de Super Rosa 50x+. Mão 1 com proteção em 2.00x e Mão 2 buscando 50.00x+.'
+          : 'Padrão 82b.game: Gatilho Oficial de Vela Rosa (+12m). Mão 1 protege em 2.00x para salvar se vier roxa, Mão 2 sobe para 10.00x+.',
       });
-    });
+
+      if (secondsRemaining >= -60) break;
+    }
   });
 
-  // 2. Generate +12M targets for each pink candle (ALVO: ROSA)
-  eligiblePinks.forEach((source) => {
-    const interval: MinutePatternInterval = 12;
-    const targetTimestamp =
-      source.timestamp + interval * 60 * 1000 + entryOffsetSeconds * 1000;
-    const targetDate = new Date(targetTimestamp);
-    const targetMinute = targetDate.getMinutes();
-    const targetSecond = targetDate.getSeconds();
-    const targetTimeFormatted = targetDate.toLocaleTimeString('pt-BR');
-    const windowStartSec = (targetSecond - 5 + 60) % 60;
-    const windowEndSec = (targetSecond + 15) % 60;
-    const secondWindow = `:${String(windowStartSec).padStart(2, '0')}s a :${String(windowEndSec).padStart(2, '0')}s`;
-    const secondsRemaining = Math.round((targetTimestamp - currentTime) / 1000);
+  // 3. Fallback projection anchored strictly to house rules
+  const upcomingCount = rawTargets.filter((t) => t.secondsRemaining >= -60).length;
+  if (upcomingCount < 2 && candles.length > 0) {
+    const anchorCandle = candles[0];
+    const anchorSec = new Date(anchorCandle.timestamp).getSeconds();
+    const anchorMin = anchorCandle.payingMinute;
 
-    let status: SurgicalTarget['status'] = 'WAITING';
-    let validationOutcome: SurgicalTarget['validationOutcome'] = undefined;
-    let validatedMultiplier: number | undefined = undefined;
-
-    if (secondsRemaining > 35) {
-      status = 'WAITING';
-    } else if (secondsRemaining > 0 && secondsRemaining <= 35) {
-      status = 'PREPARE';
-    } else if (secondsRemaining <= 0 && secondsRemaining >= -15) {
-      status = 'ACTIVE_SHOOTING';
-    } else {
-      const hitCandle = candles.find(
-        (c) =>
-          c.payingMinute === targetMinute &&
-          Math.abs(c.timestamp - targetTimestamp) <= 65 * 1000
-      );
-      if (hitCandle) {
-        validatedMultiplier = hitCandle.multiplier;
-        if (hitCandle.multiplier >= 10.0) {
-          status = 'VALIDATED_HIT';
-          validationOutcome = 'EXACT_PINK_HIT'; // Acerto exato de Rosa
-        } else if (hitCandle.multiplier >= 2.0) {
-          status = 'VALIDATED_HIT';
-          validationOutcome = 'PROTECTION_PURPLE_ON_PINK'; // Mão 1 salvou em 2.00x, mas pagou roxa
-        } else {
-          status = 'EXPIRED_MISS';
-          validationOutcome = 'MISS_BLUE';
-        }
-      } else {
-        status = 'EXPIRED_MISS';
-        validationOutcome = 'MISS_BLUE';
-      }
-    }
-
-    const patternStat = statsMap.get(interval);
-    let confidence = patternStat ? patternStat.accuracyRate : 92;
-    if (source.multiplier >= 50.0) {
-      confidence = Math.min(98, confidence + 5);
-    }
-
-    const secStr = String(targetSecond).padStart(2, '0');
-    const isSuper = source.multiplier >= 50.0;
-
-    rawTargets.push({
-      id: `surg-pink-${source.id}-12`,
-      interval: 12,
-      targetColor: 'pink',
-      isSuperPink50x: isSuper,
-      sourceCandleId: source.id,
-      sourceMultiplier: source.multiplier,
-      sourceTimestamp: source.timestamp,
-      sourceMinute: source.payingMinute,
-      targetMinute,
-      targetSecond,
-      targetTimestamp,
-      targetTimeFormatted,
-      secondWindow,
-      secondsRemaining,
-      status,
-      confidence,
-      targetMultiplier: isSuper
-        ? '50.00x+ (Super Rosa | Minutagem +12M)'
-        : '10.00x+ (Vela Rosa | Minutagem +12M)',
-      protectionGale: isSuper
-        ? `Super Rosa 50x+ aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: 50.00x+)`
-        : `Disparo aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: 10.00x+)`,
-      hasConfluence: false,
-      validationOutcome,
-      validatedMultiplier,
-      houseRuleTip: isSuper
-        ? 'Padrão 82b.game: Ciclo Crítico de Super Rosa 50x+. Mão 1 com proteção em 2.00x e Mão 2 buscando 50.00x+.'
-        : 'Padrão 82b.game: Gatilho Oficial de Vela Rosa (+12m). Mão 1 protege em 2.00x, Mão 2 sobe para 10.00x+.',
-    });
-  });
-
-  // Ensure there are always upcoming active targets projected strictly from 4m/5m/12m rules
-  const upcomingCount = rawTargets.filter((t) => t.secondsRemaining >= -15).length;
-  if (upcomingCount < 3) {
-    const latestPink = eligiblePinks[0] || null;
-    const latestPurple = eligiblePurples[0] || null;
-    const anchorCandle = candles.length > 0 ? candles[0] : null;
-    const anchorSecond = anchorCandle
-      ? new Date(anchorCandle.timestamp).getSeconds()
-      : 18;
-    const secStr = String(anchorSecond).padStart(2, '0');
-    const windowStartSec = (anchorSecond - 5 + 60) % 60;
-    const windowEndSec = (anchorSecond + 15) % 60;
-    const secondWindow = `:${String(windowStartSec).padStart(2, '0')}s a :${String(windowEndSec).padStart(2, '0')}s`;
-
-    // Dynamic targets to add: +4M, +5M for Roxa and +12M for Rosa
-    const projectedConfigs: { interval: MinutePatternInterval; targetColor: 'purple' | 'pink' }[] = [
-      { interval: 4, targetColor: 'purple' },
-      { interval: 5, targetColor: 'purple' },
-      { interval: 12, targetColor: 'pink' },
-    ];
-
-    projectedConfigs.forEach(({ interval, targetColor }, idx) => {
-      const isPink = targetColor === 'pink';
-      // Base timestamp for projection
-      const baseCandle = isPink ? latestPink || anchorCandle : latestPurple || anchorCandle;
-      const baseTime = baseCandle ? baseCandle.timestamp : currentTime - 60000;
-      let targetTimestamp = baseTime + interval * 60 * 1000 + entryOffsetSeconds * 1000;
-
-      // If target would be in past, project forward from current time
-      if (targetTimestamp - currentTime < -15000) {
-        const d = new Date(currentTime);
-        d.setMinutes(d.getMinutes() + (isPink ? 12 : interval === 4 ? 4 : 5));
-        d.setSeconds(anchorSecond);
-        d.setMilliseconds(0);
-        targetTimestamp = d.getTime() + entryOffsetSeconds * 1000;
-      }
-
-      const secondsRemaining = Math.round((targetTimestamp - currentTime) / 1000);
-      if (secondsRemaining < -15) return;
-
-      const targetDate = new Date(targetTimestamp);
-      const targetMinute = targetDate.getMinutes();
-      const targetTimeFormatted = targetDate.toLocaleTimeString('pt-BR');
-
-      // Check if target for this exact minute & interval already exists
-      const exists = rawTargets.some(
-        (t) =>
-          t.interval === interval &&
-          Math.abs(t.secondsRemaining - secondsRemaining) < 25
-      );
-      if (exists) return;
-
-      let status: SurgicalTarget['status'] = 'WAITING';
-      if (secondsRemaining > 35) status = 'WAITING';
-      else if (secondsRemaining > 0 && secondsRemaining <= 35) status = 'PREPARE';
-      else if (secondsRemaining <= 0 && secondsRemaining >= -15) status = 'ACTIVE_SHOOTING';
+    // Check next pink cycle from anchor
+    const pinkTargetMin = (anchorMin + 12) % 60;
+    const pinkKey = `pink-${pinkTargetMin}`;
+    if (!addedKeys.has(pinkKey)) {
+      const curDate = new Date(currentTime);
+      let minDiff = (pinkTargetMin - curDate.getMinutes() + 60) % 60;
+      if (minDiff === 0 && curDate.getSeconds() > 50) minDiff = 12;
+      const targetTimestamp = currentTime + minDiff * 60 * 1000 - curDate.getSeconds() * 1000;
+      const secRemaining = Math.round((targetTimestamp - currentTime) / 1000);
 
       rawTargets.push({
-        id: `dyn-proj-${interval}-${idx}-${targetTimestamp}`,
-        interval,
-        targetColor,
-        isSuperPink50x: isPink && (baseCandle?.multiplier || 0) >= 50.0,
-        sourceCandleId: baseCandle?.id || 'live-anchor',
-        sourceMultiplier: baseCandle?.multiplier || (isPink ? 12.5 : 2.5),
-        sourceTimestamp: baseCandle?.timestamp || currentTime,
-        sourceMinute: baseCandle?.payingMinute || targetDate.getMinutes(),
-        targetMinute,
-        targetSecond: anchorSecond,
+        id: `anchor-pink-${pinkTargetMin}`,
+        interval: 12,
+        targetColor: 'pink',
+        isSuperPink50x: false,
+        sourceCandleId: anchorCandle.id,
+        sourceMultiplier: 12.0,
+        sourceTimestamp: anchorCandle.timestamp,
+        sourceMinute: anchorMin,
+        targetMinute: pinkTargetMin,
+        targetSecond: anchorSec,
         targetTimestamp,
-        targetTimeFormatted,
-        secondWindow,
-        secondsRemaining,
-        status,
-        confidence: isPink ? 93 : interval === 5 ? 90 : 88,
-        targetMultiplier: isPink
-          ? '10.00x+ (Vela Rosa | Minutagem +12M)'
-          : interval === 4
-          ? '2.00x a 3.50x (1ª Entrada Roxa +4M)'
-          : '2.00x a 5.00x (2ª Entrada / Gale +5M)',
-        protectionGale: isPink
-          ? `Disparo aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: 10.00x+)`
-          : `Disparo aos :${secStr}s com proteção em 2.00x (Aguarde a rodada certa)`,
+        targetTimeFormatted: `:${String(pinkTargetMin).padStart(2, '0')}`,
+        secondWindow: '1ª Rodada: :05s a :25s • 2ª Rodada: :28s a :52s',
+        secondsRemaining: secRemaining,
+        status: secRemaining <= 0 && secRemaining >= -60 ? 'ACTIVE_SHOOTING' : secRemaining <= 35 ? 'PREPARE' : 'WAITING',
+        confidence: 91,
+        targetMultiplier: '10.00x+ (Vela Rosa | Minutagem +12M)',
+        protectionGale: `Alvo Rosa no minuto :${String(pinkTargetMin).padStart(2, '0')} (Mão 1: Saque 2.00x | Mão 2: 10.00x+)`,
         hasConfluence: false,
-        houseRuleTip: isPink
-          ? 'Padrão 82b.game: Vela Rosa Oficial (+12m). Entrada com 2 mãos (Proteção em 2x).'
-          : interval === 4
-          ? 'Padrão 82b.game: 1ª Entrada Oficial Roxa (+4m). Saque seguro em 2.00x.'
-          : 'Padrão 82b.game: 2ª Entrada / Confirmação Roxa (+5m). Alvo 2.00x a 5.00x.',
+        houseRuleTip: 'Padrão 82b.game: Ciclo de Vela Rosa (+12m). Mão 1 salva em 2.00x se a casa segurar na roxa.',
       });
+      addedKeys.add(pinkKey);
+    }
+
+    // Check next purple cycles from anchor
+    ([4, 5] as MinutePatternInterval[]).forEach((interval) => {
+      const purpleTargetMin = (anchorMin + interval) % 60;
+      const purpleKey = `purple-${purpleTargetMin}-${interval}`;
+      if (!addedKeys.has(purpleKey)) {
+        const curDate = new Date(currentTime);
+        let minDiff = (purpleTargetMin - curDate.getMinutes() + 60) % 60;
+        if (minDiff === 0 && curDate.getSeconds() > 50) minDiff = interval;
+        const targetTimestamp = currentTime + minDiff * 60 * 1000 - curDate.getSeconds() * 1000;
+        const secRemaining = Math.round((targetTimestamp - currentTime) / 1000);
+
+        rawTargets.push({
+          id: `anchor-purple-${purpleTargetMin}-${interval}`,
+          interval,
+          targetColor: 'purple',
+          isSuperPink50x: false,
+          sourceCandleId: anchorCandle.id,
+          sourceMultiplier: 2.5,
+          sourceTimestamp: anchorCandle.timestamp,
+          sourceMinute: anchorMin,
+          targetMinute: purpleTargetMin,
+          targetSecond: anchorSec,
+          targetTimestamp,
+          targetTimeFormatted: `:${String(purpleTargetMin).padStart(2, '0')}`,
+          secondWindow: '1ª Rodada: :05s a :25s • 2ª Rodada: :28s a :52s',
+          secondsRemaining: secRemaining,
+          status: secRemaining <= 0 && secRemaining >= -60 ? 'ACTIVE_SHOOTING' : secRemaining <= 35 ? 'PREPARE' : 'WAITING',
+          confidence: interval === 4 ? 88 : 90,
+          targetMultiplier: interval === 4 ? '2.00x a 3.50x (1ª Entrada Roxa +4M)' : '2.00x a 5.00x (2ª Entrada Roxa +5M)',
+          protectionGale: `Entrada no minuto :${String(purpleTargetMin).padStart(2, '0')} com saque em 2.00x`,
+          hasConfluence: false,
+          houseRuleTip: 'Padrão 82b.game: Vela Roxa com saque automático garantido em 2.00x na Mão 1.',
+        });
+        addedKeys.add(purpleKey);
+      }
     });
   }
 
