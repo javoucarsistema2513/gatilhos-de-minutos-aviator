@@ -282,23 +282,23 @@ export function evaluateLiveSignal(
   const payingMinuteStr = `:${String(targetMinute).padStart(2, '0')}`;
 
   // =========================================================================
-  // 1. GATILHO ATIVO DA MINUTAGEM ROSA (+12 MINUTOS)
+  // 1. GATILHO ATIVO DA MINUTAGEM ROSA (+12 MINUTOS) NO 82B.GAME
   // Dispara apenas quando atinge a janela oficial da vela rosa (+12m)
   // =========================================================================
-  if (activeTarget && activeTarget.interval === 12) {
-    const isSuper = activeTarget.sourceMultiplier >= 50.0;
+  if (activeTarget && (activeTarget.targetColor === 'pink' || activeTarget.interval === 12)) {
+    const isSuper = activeTarget.isSuperPink50x || activeTarget.sourceMultiplier >= 50.0;
     return {
       id: `pink-target-${activeTarget.id}`,
       type: isSuper ? 'SUPER_PINK_50X' : 'PINK_RADAR',
       level: 'EXTREME',
       title: isSuper
-        ? '👑 ALERTA MÁXIMO: SUPER ROSA 50X+ (MINUTAGEM +12M)'
-        : '🌸 ALERTA MINUTAGEM: VELA ROSA 10X+ (+12 MINUTOS)',
+        ? '👑 ALERTA MÁXIMO: SUPER ROSA 50X+ (82B.GAME • +12M)'
+        : '🌸 ALERTA MINUTAGEM: VELA ROSA 10X+ (82B.GAME • +12M)',
       targetMultiplier: isSuper
         ? 'Alvo 50.00x+ (Mão 1: Saque 2.00x | Mão 2: 50.00x+)'
         : 'Alvo Duplo: Mão 1 em 2.00x (Proteção) | Mão 2 em 10.00x+',
       confidence: Math.min(97, activeTarget.confidence + 5),
-      triggerReason: `Minutagem oficial de 12 minutos confirmada a partir da saída da vela rosa de ${activeTarget.sourceMultiplier.toFixed(2)}x. Alinhamento calibrado: entre exatamente no segundo :${secStr}s da rodada do minuto :${String(targetMinute).padStart(2, '0')}. Não aposte na rodada anterior!`,
+      triggerReason: `Minutagem oficial de 12 minutos mapeada no 82b.game a partir da vela rosa de ${activeTarget.sourceMultiplier.toFixed(2)}x. Alinhamento calibrado da casa: entrada no segundo :${secStr}s do minuto :${String(targetMinute).padStart(2, '0')}. Mão 1 com saque automático em 2.00x (proteção da banca caso a casa pague roxa) e Mão 2 buscando 10.00x+.`,
       stopGain: '10.00x',
       protectionGale: `Disparo aos :${secStr}s (Mão 1: Saque 2.00x proteção | Mão 2: 10.00x+)`,
       timestamp: Date.now(),
@@ -314,10 +314,10 @@ export function evaluateLiveSignal(
   }
 
   // =========================================================================
-  // 2. GATILHO ATIVO DA MINUTAGEM ROXA (+4 MINUTOS OU +5 MINUTOS)
+  // 2. GATILHO ATIVO DA MINUTAGEM ROXA (+4M OU +5M) NO 82B.GAME
   // Dispara apenas quando atinge a janela oficial da vela roxa (+4m ou +5m)
   // =========================================================================
-  if (activeTarget && (activeTarget.interval === 4 || activeTarget.interval === 5)) {
+  if (activeTarget && (activeTarget.targetColor === 'purple' || activeTarget.interval === 4 || activeTarget.interval === 5)) {
     const isSecondEntry = activeTarget.interval === 5;
     return {
       id: `purple-target-${activeTarget.id}`,
@@ -330,7 +330,7 @@ export function evaluateLiveSignal(
         ? 'Buscar 2.00x com expansão até 5.00x'
         : 'Buscar 2.00x (Saque de proteção na Mão 1)',
       confidence: activeTarget.confidence,
-      triggerReason: `Minutagem oficial de ${activeTarget.interval} minutos após a saída da vela roxa de ${activeTarget.sourceMultiplier.toFixed(2)}x. Entrada no segundo :${secStr}s do minuto :${String(targetMinute).padStart(2, '0')}. Alinhamento no ponto exato para evitar antecipação de entrada.`,
+      triggerReason: `Minutagem oficial de ${activeTarget.interval} minutos no 82b.game após a vela roxa de ${activeTarget.sourceMultiplier.toFixed(2)}x. Entrada cirúrgica no segundo :${secStr}s do minuto :${String(targetMinute).padStart(2, '0')}. Alvo: Vela Roxa (2.00x a 3.50x). Caso a casa pague rosa, o resultado é lucro ampliado.`,
       stopGain: '2.00x',
       protectionGale: `Disparo aos :${secStr}s com saque seguro em 2.00x (Aguarde o segundo da rodada certa)`,
       timestamp: Date.now(),
@@ -345,10 +345,10 @@ export function evaluateLiveSignal(
   }
 
   // =========================================================================
-  // 3. RADAR EM MONITORAMENTO ATIVO (AGUARDANDO APROXIMAÇÃO DA MINUTAGEM)
+  // 3. RADAR EM MONITORAMENTO ATIVO NO 82B.GAME (AGUARDANDO MINUTAGEM)
   // =========================================================================
   const nextTargetName =
-    nextTarget?.interval === 12
+    nextTarget?.targetColor === 'pink' || nextTarget?.interval === 12
       ? 'Vela Rosa (+12m)'
       : nextTarget?.interval === 5
       ? 'Vela Roxa (+5m - Confirmação)'
@@ -358,12 +358,12 @@ export function evaluateLiveSignal(
     id: `radar-standby-${Date.now()}`,
     type: 'STANDBY',
     level: 'INFO',
-    title: `📡 RADAR ATIVO: AGUARDANDO ${nextTargetName.toUpperCase()}`,
+    title: `📡 RADAR 82B.GAME: AGUARDANDO ${nextTargetName.toUpperCase()}`,
     targetMultiplier: nextTarget?.targetMultiplier || 'Minutagem +4m/+5m (Roxa) | +12m (Rosa)',
     confidence: nextTarget?.confidence || 86,
     triggerReason: nextTarget
-      ? `Monitorando minutagem oficial (+4m e +5m para cada vela roxa | +12m para cada vela rosa). Próxima entrada calculada: ${nextTargetName} no minuto :${String(targetMinute).padStart(2, '0')} aos :${secStr}s (${targetTimeFormatted}). Aguarde aproximação para entrada cirúrgica.`
-      : 'Radar pronto. Monitorando saída de velas roxas (alvo +4m e +5m) e velas rosas (alvo +12m).',
+      ? `Monitorando padrões da casa 82b.game (+4m/+5m para vela roxa | +12m para vela rosa). Próxima entrada: ${nextTargetName} no minuto :${String(targetMinute).padStart(2, '0')} aos :${secStr}s (${targetTimeFormatted}). Cálculos em tempo real ativos.`
+      : 'Radar pronto no 82b.game. Monitorando saída de velas roxas (alvo +4m/+5m) e rosas (alvo +12m).',
     stopGain: '2.00x',
     protectionGale: `Aguarde o segundo :${secStr}s da rodada certa (Não aposte na rodada anterior)`,
     timestamp: Date.now(),
@@ -426,11 +426,13 @@ export function calculateSurgicalPatternStats(candles: AviatorCandle[]): MinuteP
   const sorted = candles.slice().sort((a, b) => a.timestamp - b.timestamp);
 
   return intervals.map((interval) => {
+    const isPinkTarget = interval === 12;
+    const targetColor: 'purple' | 'pink' = isPinkTarget ? 'pink' : 'purple';
     const meta = MINUTE_PATTERN_DEFINITIONS[interval] || {
       name: `Minutagem +${interval}M`,
       label: `${interval}M`,
       description: `Ciclo de ${interval} minutos`,
-      idealTarget: 'Buscar 2.00x',
+      idealTarget: isPinkTarget ? 'Buscar 10.00x+' : 'Buscar 2.00x',
     };
     let totalTested = 0;
     let hitsCount = 0;
@@ -458,17 +460,35 @@ export function calculateSurgicalPatternStats(candles: AviatorCandle[]): MinuteP
 
       if (candidateCandles.length > 0) {
         totalTested++;
-        // Check if candle hit
-        const winningCandle = candidateCandles.find((c) =>
-          interval === 12 ? c.multiplier >= 10.0 || c.multiplier >= 2.0 : c.multiplier >= 2.0
-        );
-        if (winningCandle) {
-          hitsCount++;
-          sumMultiplierOnHit += winningCandle.multiplier;
-          if (winningCandle.multiplier >= 10.0) {
+        if (isPinkTarget) {
+          // For PINK target (+12M):
+          // Exact Hit: candle >= 10.0 (Rosa pura)
+          // Protection Hit: candle >= 2.0 && < 10.0 (No 82b.game a Mão 1 salvou em 2.00x)
+          const pinkCandle = candidateCandles.find((c) => c.multiplier >= 10.0);
+          const purpleCandle = candidateCandles.find((c) => c.multiplier >= 2.0 && c.multiplier < 10.0);
+          if (pinkCandle) {
+            hitsCount++;
             pinkHits++;
-          } else {
+            sumMultiplierOnHit += pinkCandle.multiplier;
+          } else if (purpleCandle) {
+            hitsCount++;
             purpleHits++;
+            sumMultiplierOnHit += purpleCandle.multiplier;
+          }
+        } else {
+          // For PURPLE target (+4M / +5M):
+          // Exact Hit: candle >= 2.0 && < 10.0 (Roxa pura)
+          // Superavit Hit: candle >= 10.0 (Subida de vela / Rosa)
+          const purpleCandle = candidateCandles.find((c) => c.multiplier >= 2.0 && c.multiplier < 10.0);
+          const pinkCandle = candidateCandles.find((c) => c.multiplier >= 10.0);
+          if (purpleCandle) {
+            hitsCount++;
+            purpleHits++;
+            sumMultiplierOnHit += purpleCandle.multiplier;
+          } else if (pinkCandle) {
+            hitsCount++;
+            pinkHits++;
+            sumMultiplierOnHit += pinkCandle.multiplier;
           }
         }
       }
@@ -496,6 +516,7 @@ export function calculateSurgicalPatternStats(candles: AviatorCandle[]): MinuteP
 
     return {
       interval,
+      targetColor,
       name: meta.name,
       label: meta.label,
       description: meta.description,
@@ -520,9 +541,9 @@ export function getUpcomingSurgicalTargets(
   const stats = calculateSurgicalPatternStats(candles);
   const statsMap = new Map(stats.map((s) => [s.interval, s]));
 
-  // Sources:
-  // - Purple candles (>= 2.0 and < 10.0) trigger +4M and +5M
-  // - Pink candles (>= 10.0) trigger +12M
+  // Sources strictly partitioned:
+  // - Purple candles (>= 2.0 and < 10.0) trigger +4M and +5M exclusively
+  // - Pink candles (>= 10.0) trigger +12M exclusively
   const eligiblePurples = candles
     .filter((c) => c.multiplier >= 2.0 && c.multiplier < 10.0)
     .slice(0, 8);
@@ -533,7 +554,7 @@ export function getUpcomingSurgicalTargets(
 
   const rawTargets: SurgicalTarget[] = [];
 
-  // 1. Generate +4M and +5M targets for each purple candle
+  // 1. Generate +4M and +5M targets for each purple candle (ALVO: ROXA)
   eligiblePurples.forEach((source) => {
     const intervals: MinutePatternInterval[] = [4, 5];
     intervals.forEach((interval) => {
@@ -548,8 +569,11 @@ export function getUpcomingSurgicalTargets(
       const secondWindow = `:${String(windowStartSec).padStart(2, '0')}s a :${String(windowEndSec).padStart(2, '0')}s`;
       const secondsRemaining = Math.round((targetTimestamp - currentTime) / 1000);
 
-      // Determine Status
+      // Determine Status & Validation against historical candles
       let status: SurgicalTarget['status'] = 'WAITING';
+      let validationOutcome: SurgicalTarget['validationOutcome'] = undefined;
+      let validatedMultiplier: number | undefined = undefined;
+
       if (secondsRemaining > 35) {
         status = 'WAITING';
       } else if (secondsRemaining > 0 && secondsRemaining <= 35) {
@@ -563,10 +587,21 @@ export function getUpcomingSurgicalTargets(
             c.payingMinute === targetMinute &&
             Math.abs(c.timestamp - targetTimestamp) <= 65 * 1000
         );
-        if (hitCandle && hitCandle.multiplier >= 2.0) {
-          status = 'VALIDATED_HIT';
+        if (hitCandle) {
+          validatedMultiplier = hitCandle.multiplier;
+          if (hitCandle.multiplier >= 10.0) {
+            status = 'VALIDATED_HIT';
+            validationOutcome = 'SUPERAVIT_PINK_ON_PURPLE'; // Pagou Rosa no alvo de Roxa!
+          } else if (hitCandle.multiplier >= 2.0) {
+            status = 'VALIDATED_HIT';
+            validationOutcome = 'EXACT_PURPLE_HIT'; // Acerto exato de Roxa
+          } else {
+            status = 'EXPIRED_MISS';
+            validationOutcome = 'MISS_BLUE';
+          }
         } else {
           status = 'EXPIRED_MISS';
+          validationOutcome = 'MISS_BLUE';
         }
       }
 
@@ -577,6 +612,8 @@ export function getUpcomingSurgicalTargets(
       rawTargets.push({
         id: `surg-purple-${source.id}-${interval}`,
         interval,
+        targetColor: 'purple',
+        isSuperPink50x: false,
         sourceCandleId: source.id,
         sourceMultiplier: source.multiplier,
         sourceTimestamp: source.timestamp,
@@ -595,14 +632,20 @@ export function getUpcomingSurgicalTargets(
             : '2.00x a 5.00x (2ª Entrada / Gale +5M)',
         protectionGale:
           interval === 4
-            ? `Disparo no segundo :${secStr}s com saque seguro em 2.00x (Não aposte na rodada anterior)`
+            ? `Disparo aos :${secStr}s com saque seguro em 2.00x (Não aposte na rodada anterior)`
             : `2ª Entrada aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: Expansão)`,
         hasConfluence: false,
+        validationOutcome,
+        validatedMultiplier,
+        houseRuleTip:
+          interval === 4
+            ? 'Padrão 82b.game: 1ª Entrada Oficial após vela roxa. Saque seguro de proteção em 2.00x na Mão 1.'
+            : 'Padrão 82b.game: 2ª Entrada / Confirmação Roxa (+5m). Alvo 2.00x com expansão até 5.00x.',
       });
     });
   });
 
-  // 2. Generate +12M targets for each pink candle
+  // 2. Generate +12M targets for each pink candle (ALVO: ROSA)
   eligiblePinks.forEach((source) => {
     const interval: MinutePatternInterval = 12;
     const targetTimestamp =
@@ -617,6 +660,9 @@ export function getUpcomingSurgicalTargets(
     const secondsRemaining = Math.round((targetTimestamp - currentTime) / 1000);
 
     let status: SurgicalTarget['status'] = 'WAITING';
+    let validationOutcome: SurgicalTarget['validationOutcome'] = undefined;
+    let validatedMultiplier: number | undefined = undefined;
+
     if (secondsRemaining > 35) {
       status = 'WAITING';
     } else if (secondsRemaining > 0 && secondsRemaining <= 35) {
@@ -629,10 +675,21 @@ export function getUpcomingSurgicalTargets(
           c.payingMinute === targetMinute &&
           Math.abs(c.timestamp - targetTimestamp) <= 65 * 1000
       );
-      if (hitCandle && hitCandle.multiplier >= 2.0) {
-        status = 'VALIDATED_HIT';
+      if (hitCandle) {
+        validatedMultiplier = hitCandle.multiplier;
+        if (hitCandle.multiplier >= 10.0) {
+          status = 'VALIDATED_HIT';
+          validationOutcome = 'EXACT_PINK_HIT'; // Acerto exato de Rosa
+        } else if (hitCandle.multiplier >= 2.0) {
+          status = 'VALIDATED_HIT';
+          validationOutcome = 'PROTECTION_PURPLE_ON_PINK'; // Mão 1 salvou em 2.00x, mas pagou roxa
+        } else {
+          status = 'EXPIRED_MISS';
+          validationOutcome = 'MISS_BLUE';
+        }
       } else {
         status = 'EXPIRED_MISS';
+        validationOutcome = 'MISS_BLUE';
       }
     }
 
@@ -648,6 +705,8 @@ export function getUpcomingSurgicalTargets(
     rawTargets.push({
       id: `surg-pink-${source.id}-12`,
       interval: 12,
+      targetColor: 'pink',
+      isSuperPink50x: isSuper,
       sourceCandleId: source.id,
       sourceMultiplier: source.multiplier,
       sourceTimestamp: source.timestamp,
@@ -667,6 +726,11 @@ export function getUpcomingSurgicalTargets(
         ? `Super Rosa 50x+ aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: 50.00x+)`
         : `Disparo aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: 10.00x+)`,
       hasConfluence: false,
+      validationOutcome,
+      validatedMultiplier,
+      houseRuleTip: isSuper
+        ? 'Padrão 82b.game: Ciclo Crítico de Super Rosa 50x+. Mão 1 com proteção em 2.00x e Mão 2 buscando 50.00x+.'
+        : 'Padrão 82b.game: Gatilho Oficial de Vela Rosa (+12m). Mão 1 protege em 2.00x, Mão 2 sobe para 10.00x+.',
     });
   });
 
@@ -685,13 +749,14 @@ export function getUpcomingSurgicalTargets(
     const secondWindow = `:${String(windowStartSec).padStart(2, '0')}s a :${String(windowEndSec).padStart(2, '0')}s`;
 
     // Dynamic targets to add: +4M, +5M for Roxa and +12M for Rosa
-    const projectedConfigs: { interval: MinutePatternInterval; isPink: boolean }[] = [
-      { interval: 4, isPink: false },
-      { interval: 5, isPink: false },
-      { interval: 12, isPink: true },
+    const projectedConfigs: { interval: MinutePatternInterval; targetColor: 'purple' | 'pink' }[] = [
+      { interval: 4, targetColor: 'purple' },
+      { interval: 5, targetColor: 'purple' },
+      { interval: 12, targetColor: 'pink' },
     ];
 
-    projectedConfigs.forEach(({ interval, isPink }, idx) => {
+    projectedConfigs.forEach(({ interval, targetColor }, idx) => {
+      const isPink = targetColor === 'pink';
       // Base timestamp for projection
       const baseCandle = isPink ? latestPink || anchorCandle : latestPurple || anchorCandle;
       const baseTime = baseCandle ? baseCandle.timestamp : currentTime - 60000;
@@ -729,6 +794,8 @@ export function getUpcomingSurgicalTargets(
       rawTargets.push({
         id: `dyn-proj-${interval}-${idx}-${targetTimestamp}`,
         interval,
+        targetColor,
+        isSuperPink50x: isPink && (baseCandle?.multiplier || 0) >= 50.0,
         sourceCandleId: baseCandle?.id || 'live-anchor',
         sourceMultiplier: baseCandle?.multiplier || (isPink ? 12.5 : 2.5),
         sourceTimestamp: baseCandle?.timestamp || currentTime,
@@ -750,6 +817,11 @@ export function getUpcomingSurgicalTargets(
           ? `Disparo aos :${secStr}s (Mão 1: Saque 2.00x | Mão 2: 10.00x+)`
           : `Disparo aos :${secStr}s com proteção em 2.00x (Aguarde a rodada certa)`,
         hasConfluence: false,
+        houseRuleTip: isPink
+          ? 'Padrão 82b.game: Vela Rosa Oficial (+12m). Entrada com 2 mãos (Proteção em 2x).'
+          : interval === 4
+          ? 'Padrão 82b.game: 1ª Entrada Oficial Roxa (+4m). Saque seguro em 2.00x.'
+          : 'Padrão 82b.game: 2ª Entrada / Confirmação Roxa (+5m). Alvo 2.00x a 5.00x.',
       });
     });
   }

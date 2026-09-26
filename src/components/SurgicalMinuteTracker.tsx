@@ -337,22 +337,22 @@ export const SurgicalMinuteTracker: React.FC<SurgicalMinuteTrackerProps> = ({
         </div>
       )}
 
-      {/* Grid of the 4 Main Surgical Patterns (2, 3, 4 and 5 minutes) */}
+      {/* Grid of the 3 Main Surgical Patterns (4M Roxa, 5M Roxa, 12M Rosa) */}
       <div>
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-pink-400" />
             <h3 className="text-sm font-black uppercase tracking-wider text-white">
-              Monitoramento dos 4 Padrões em Tempo Real
+              Monitoramento dos Padrões Oficiais (Roxa +4m/+5m • Rosa +12m)
             </h3>
           </div>
           <span className="text-xs text-slate-400">
-            Atualização contínua a cada segundo
+            Padrões da Casa 82b.game em Tempo Real
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {([2, 3, 4, 5] as MinutePatternInterval[]).map((interval) => {
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {([4, 5, 12] as MinutePatternInterval[]).map((interval) => {
             const def = MINUTE_PATTERN_DEFINITIONS[interval];
             const stat = patternStats.find((s) => s.interval === interval);
             const target = targets.find((t) => t.interval === interval);
@@ -416,13 +416,11 @@ export const SurgicalMinuteTracker: React.FC<SurgicalMinuteTrackerProps> = ({
                   <div className="flex items-center gap-3">
                     <div
                       className={`flex h-11 w-11 items-center justify-center rounded-xl font-black text-sm border shadow-inner ${
-                        interval === 5
-                          ? 'border-pink-500/40 bg-pink-950/50 text-pink-300'
-                          : interval === 3
-                          ? 'border-purple-500/40 bg-purple-950/50 text-purple-300'
-                          : interval === 2
-                          ? 'border-cyan-500/40 bg-cyan-950/50 text-cyan-300'
-                          : 'border-amber-500/40 bg-amber-950/50 text-amber-300'
+                        interval === 12
+                          ? 'border-pink-500/40 bg-pink-950/50 text-pink-300 shadow-pink-500/20'
+                          : interval === 5
+                          ? 'border-purple-500/40 bg-purple-950/50 text-purple-300 shadow-purple-500/20'
+                          : 'border-indigo-500/40 bg-indigo-950/50 text-indigo-300 shadow-indigo-500/20'
                       }`}
                     >
                       +{interval}M

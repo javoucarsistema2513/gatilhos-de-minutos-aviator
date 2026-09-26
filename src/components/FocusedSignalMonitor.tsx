@@ -36,7 +36,7 @@ import {
   VolumeX,
   Zap,
 } from 'lucide-react';
-import { getUpcomingSurgicalTargets } from '../utils/calculator';
+import { calculateSpribeRoundDuration, getUpcomingSurgicalTargets } from '../utils/calculator';
 import {
   playCountdownBeep,
   playTriggerNowSound,
@@ -278,35 +278,28 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     if (filterMode === 'SUPER_PINK_50X') {
       const supers = validTargets.filter(
         (t) =>
-          t.targetMultiplier.includes('50.00x') ||
+          t.isSuperPink50x ||
           t.sourceMultiplier >= 50.0 ||
-          t.interval === 5
+          t.targetMultiplier.includes('50.00x')
       );
       return supers.length > 0 ? supers : validTargets;
     }
 
     if (filterMode === 'PINK_ONLY') {
       const pinks = validTargets.filter(
-        (t) =>
-          t.targetMultiplier.includes('Rosa') ||
-          t.interval === 5 ||
-          t.sourceMultiplier >= 10.0
+        (t) => t.targetColor === 'pink' || t.interval === 12
       );
       return pinks.length > 0 ? pinks : validTargets;
     }
 
     if (filterMode === 'PURPLE_ONLY') {
       const purples = validTargets.filter(
-        (t) =>
-          !t.targetMultiplier.includes('Rosa') &&
-          !t.targetMultiplier.includes('50.00x') &&
-          t.interval !== 5 &&
-          t.sourceMultiplier < 10.0
+        (t) => t.targetColor === 'purple' || t.interval === 4 || t.interval === 5
       );
       return purples.length > 0 ? purples : validTargets;
     }
 
-    // AUTO MODE: smart selection
+    // AUTO MODE: smart selection based on upcoming timeline
     return validTargets;
   }, [targets, filterMode]);
 
@@ -337,18 +330,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     const curMin = now.getMinutes();
     const secTarget = lastCandle ? new Date(lastCandle.timestamp).getSeconds() : 18;
 
-    const isSuper =
-      filterMode === 'SUPER_PINK_50X' ||
-      (filterMode === 'AUTO' &&
-        (superPinkAnalysis?.isInCriticalZone || currentSignal.type === 'SUPER_PINK_50X'));
-
-    const isPink =
-      !isSuper &&
-      (filterMode === 'PINK_ONLY' ||
-        (filterMode === 'AUTO' &&
-          (isLastCandlePink ||
-            statistics.roundsSinceLastPink >= 12 ||
-            currentSignal.type === 'PINK_RADAR')));
+    const isSuper = filterMode === 'SUPER_PINK_50X';
+    const isPink = !isSuper && (filterMode === 'PINK_ONLY' || (filterMode === 'AUTO' && isLastCandlePink));
+    const targetColor: 'purple' | 'pink' = isPink || isSuper ? 'pink' : 'purple';
 
     // Strictly respect 12m for pink and 4m for purple
     const patternInterval: MinutePatternInterval = isPink || isSuper ? 12 : 4;
@@ -360,6 +344,8 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     return {
       id: `live-active-${targetMin}-${secTarget}`,
       interval: patternInterval,
+      targetColor,
+      isSuperPink50x: isSuper,
       sourceCandleId: lastCandle?.id || 'live-anchor',
       sourceMultiplier: lastCandle?.multiplier || (isPink ? 12.5 : 2.5),
       sourceTimestamp: lastCandle?.timestamp || currentTime,
@@ -383,6 +369,9 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
         ? `Alvo Rosa aos :${secStr}s (Mão 1: 2.00x | Mão 2: 10.00x+)`
         : `Disparo aos :${secStr}s com proteção em 2.00x (Aguarde a rodada certa)`,
       hasConfluence: false,
+      houseRuleTip: isPink
+        ? 'Padrão 82b.game: Vela Rosa (+12m) com proteção de Mão 1 em 2.00x.'
+        : 'Padrão 82b.game: Vela Roxa (+4m) com saque em 2.00x.',
     };
   }, [
     nextTarget,
@@ -391,11 +380,6 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
     filterMode,
     isLastCandlePink,
     entryOffset,
-    superPinkAnalysis?.isInCriticalZone,
-    statistics.roundsSinceLastPink,
-    statistics.currentStreakColor,
-    statistics.currentStreakCount,
-    currentSignal.type,
   ]);
 
   // Secondary upcoming target (the one after the next)
@@ -412,60 +396,31 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
   }, [relevantTargets, activeTarget]);
 
   // Determine if the PREDICTED upcoming candle is Super Pink (50x+), Pink or Purple
+  // Strictly adhering to 82b.game house patterns and explicit targetColor:
   const isSuperPinkUpcoming = useMemo(() => {
     if (filterMode === 'SUPER_PINK_50X') return true;
-    if (currentSignal.type === 'SUPER_PINK_50X') return true;
-    if (activeTarget && activeTarget.targetMultiplier.includes('50.00x')) return true;
-    if (
-      filterMode === 'AUTO' &&
-      superPinkAnalysis?.isInCriticalZone &&
-      statistics.currentStreakColor === 'blue'
-    ) {
+    if (filterMode === 'PURPLE_ONLY') return false;
+    if (activeTarget.isSuperPink50x) return true;
+    if (activeTarget.targetColor === 'pink' && (activeTarget.sourceMultiplier >= 50.0 || activeTarget.targetMultiplier.includes('50.00x'))) {
       return true;
     }
+    if (currentSignal.type === 'SUPER_PINK_50X') return true;
     return false;
-  }, [
-    filterMode,
-    currentSignal.type,
-    activeTarget,
-    superPinkAnalysis?.isInCriticalZone,
-    statistics.currentStreakColor,
-  ]);
+  }, [filterMode, activeTarget, currentSignal.type]);
 
   const isPinkUpcoming = useMemo(() => {
     if (isSuperPinkUpcoming) return false;
     if (filterMode === 'PINK_ONLY') return true;
     if (filterMode === 'PURPLE_ONLY') return false;
+    // Strict adherence to targetColor:
+    if (activeTarget.targetColor === 'pink') return true;
+    if (activeTarget.targetColor === 'purple') return false;
+    return activeTarget.interval === 12;
+  }, [isSuperPinkUpcoming, filterMode, activeTarget]);
 
-    // In AUTO mode:
-    if (
-      activeTarget &&
-      (activeTarget.targetMultiplier.includes('Rosa') ||
-        activeTarget.interval === 5 ||
-        activeTarget.sourceMultiplier >= 10.0)
-    ) {
-      return true;
-    }
-
-    if (
-      currentSignal.type === 'PINK_RADAR' ||
-      currentSignal.type === 'DUAL_BREAKOUT' ||
-      statistics.roundsSinceLastPink >= 12 ||
-      (statistics.currentStreakColor === 'blue' && statistics.currentStreakCount >= 3)
-    ) {
-      return true;
-    }
-
-    return false;
-  }, [
-    isSuperPinkUpcoming,
-    filterMode,
-    activeTarget,
-    currentSignal.type,
-    statistics.roundsSinceLastPink,
-    statistics.currentStreakColor,
-    statistics.currentStreakCount,
-  ]);
+  const isPurpleUpcoming = useMemo(() => {
+    return !isSuperPinkUpcoming && !isPinkUpcoming;
+  }, [isSuperPinkUpcoming, isPinkUpcoming]);
 
   // Formatted minute and countdown
   const targetMinute = useMemo(() => {
@@ -1532,6 +1487,92 @@ export const FocusedSignalMonitor: React.FC<FocusedSignalMonitorProps> = ({
                   ✅ +1 Rodada Calibrada
                 </span>
               )}
+            </div>
+
+            {/* Real-time House Calculations & Assertive Distinction (82b.game) */}
+            <div className="mt-3 rounded-xl border border-indigo-500/30 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950/40 p-3 space-y-2.5">
+              <div className="flex items-center justify-between flex-wrap gap-1.5 border-b border-slate-800/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span className="text-xs font-black text-white tracking-wide uppercase">
+                    Cálculos em Tempo Real • Padrões 82b.game
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/20 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+                  Mapeamento Assertivo Ativo
+                </span>
+              </div>
+
+              {/* Grid 2-cols: Target Distinction & Realtime House Physics */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                {/* Col 1: Candle Type Distinction */}
+                <div className="rounded-lg bg-slate-950/80 border border-slate-800 p-2.5 space-y-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Distinção Cirúrgica do Alvo:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-xs font-black uppercase flex items-center gap-1 ${
+                        isSuperPinkUpcoming
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : isPinkUpcoming
+                          ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40'
+                          : 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                      }`}
+                    >
+                      {isSuperPinkUpcoming
+                        ? '👑 Super Rosa 50x+'
+                        : isPinkUpcoming
+                        ? '🌸 Vela Rosa (10x+)'
+                        : '🟣 Vela Roxa (2x - 9.99x)'}
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-300">
+                      Ciclo +{activeTarget.interval}M
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    {isSuperPinkUpcoming
+                      ? 'Retenção crítica no 82b.game. Estratégia de Duas Mãos: Mão 1 com Cashout em 2.00x para proteger a banca e Mão 2 buscando 50.00x+.'
+                      : isPinkUpcoming
+                      ? 'Minutagem oficial de 12 minutos (+12m) após vela rosa. Entrada com 2 Mãos: Mão 1 salva em 2.00x se vier Roxa; Mão 2 busca 10.00x+.'
+                      : 'Minutagem oficial de +4m ou +5m após vela roxa. Saque de proteção automática em 2.00x na Mão 1.'}
+                  </p>
+                </div>
+
+                {/* Col 2: Live Physics & Last Round Output in 82b.game */}
+                <div className="rounded-lg bg-slate-950/80 border border-slate-800 p-2.5 space-y-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Física da Rodada & Validação:
+                  </span>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">Última Vela:</span>
+                    <span
+                      className={`font-mono font-bold px-1.5 py-0.2 rounded text-[11px] ${
+                        lastCandle.multiplier >= 10
+                          ? 'bg-pink-950 text-pink-300 border border-pink-500/40'
+                          : lastCandle.multiplier >= 2
+                          ? 'bg-purple-950 text-purple-300 border border-purple-500/40'
+                          : 'bg-blue-950 text-blue-300 border border-blue-700'
+                      }`}
+                    >
+                      {lastCandle.multiplier.toFixed(2)}x (
+                      {lastCandle.multiplier >= 10 ? 'Rosa' : lastCandle.multiplier >= 2 ? 'Roxa' : 'Azul'})
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">Duração Física (82b.game):</span>
+                    <span className="font-mono text-slate-200 font-bold">
+                      {calculateSpribeRoundDuration(lastCandle.multiplier)}s
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">Segundo do Disparo:</span>
+                    <span className="font-mono text-emerald-400 font-bold">
+                      :{targetSecondStr}s (Janela {secondWindow})
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Reason Footnote */}

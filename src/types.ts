@@ -128,9 +128,18 @@ export type SurgicalTargetStatus =
   | 'VALIDATED_HIT'
   | 'EXPIRED_MISS';
 
+export type TargetValidationOutcome =
+  | 'EXACT_PURPLE_HIT'          // Alvo Roxa pagou Roxa (2.00x - 9.99x)
+  | 'EXACT_PINK_HIT'            // Alvo Rosa pagou Rosa (10.00x+)
+  | 'SUPERAVIT_PINK_ON_PURPLE'  // Alvo Roxa pagou Rosa (Subida de vela / Superavit)
+  | 'PROTECTION_PURPLE_ON_PINK' // Alvo Rosa pagou Roxa (Mão 1 salva em 2.00x)
+  | 'MISS_BLUE';                // Pagou Azul (< 2.00x)
+
 export interface SurgicalTarget {
   id: string;
-  interval: MinutePatternInterval; // +2m, +3m, +4m, +5m
+  interval: MinutePatternInterval; // +4m, +5m, +12m
+  targetColor: 'purple' | 'pink'; // Distinção obrigatória: Roxa (2x-9.99x) ou Rosa (10x+)
+  isSuperPink50x?: boolean;
   sourceCandleId: string;
   sourceMultiplier: number;
   sourceTimestamp: number;
@@ -148,10 +157,13 @@ export interface SurgicalTarget {
   hasConfluence: boolean;
   confluenceIntervals?: MinutePatternInterval[];
   validatedMultiplier?: number;
+  validationOutcome?: TargetValidationOutcome;
+  houseRuleTip?: string; // Dica cirúrgica baseada nos padrões do 82b.game
 }
 
 export interface MinutePatternStat {
   interval: MinutePatternInterval;
+  targetColor: 'purple' | 'pink';
   name: string;
   label: string;
   description: string;
