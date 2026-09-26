@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { AIRCRAFT_PRESETS } from '../utils/aviationFormulas';
 import { AircraftPreset } from '../types/aviation';
-import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   activeTab: string;
@@ -129,37 +128,20 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-2 pb-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
           <div className="flex items-center space-x-3">
-            {/* Red Airplane App Icon */}
-            <div className="relative w-10 h-10 rounded-xl bg-slate-950 border border-rose-500/50 p-1 flex items-center justify-center shadow-lg shadow-rose-950/60 group">
-              <img
-                src="/icon.svg"
-                alt="Avião Vermelho AeroCalc"
-                className="w-full h-full object-contain group-hover:scale-105 transition-transform"
-              />
-              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
-              </span>
+            <div className="w-9 h-9 rounded-lg bg-cyan-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-inner">
+              <Compass className="w-5 h-5 animate-spin-slow" />
             </div>
             <div>
               <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
                 AeroCalc
-                <span className="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded bg-rose-950/80 border border-rose-600/50 text-rose-300">
-                  PWA Ready
-                </span>
-                <span className="hidden sm:inline-block text-[10px] font-mono font-normal uppercase px-2 py-0.5 rounded bg-cyan-950 border border-cyan-700/50 text-cyan-300">
-                  Aviation E6B & Aviator
+                <span className="text-xs font-mono font-normal uppercase px-2 py-0.5 rounded bg-cyan-950 border border-cyan-700/50 text-cyan-300">
+                  Aviation E6B
                 </span>
               </h1>
               <p className="text-xs text-slate-400">
-                Minutagem em tempo real, projeção de velas rosas e computador de voo aeronáutico
+                Computador de voo para navegação, aerodinâmica e performance em tempo real
               </p>
             </div>
-          </div>
-
-          {/* Right Action: PWA Install Button for All Devices */}
-          <div className="flex items-center space-x-2 self-start md:self-auto">
-            <PWAInstallButton />
           </div>
         </div>
 

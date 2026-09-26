@@ -10,7 +10,6 @@ import { FuelPlanningCalculator } from './components/FuelPlanningCalculator';
 import { WeightAndBalanceCalculator } from './components/WeightAndBalanceCalculator';
 import { AviationUnitConverter } from './components/AviationUnitConverter';
 import { LiveFlightMode } from './components/LiveFlightMode';
-import { OfflineIndicator } from './components/OfflineIndicator';
 import { AIRCRAFT_PRESETS } from './utils/aviationFormulas';
 import { AircraftPreset } from './types/aviation';
 import { Plane, Compass, ShieldAlert, Activity, Sparkles, Scale, ArrowRightLeft, Radio, Flame } from 'lucide-react';
@@ -93,16 +92,13 @@ export default function App() {
         </div>
       </main>
 
-      {/* Offline Connectivity Status Toast */}
-      <OfflineIndicator />
-
       {/* Cockpit Avionics Footer */}
       <footer className="bg-slate-900 border-t border-slate-800/80 text-slate-400 text-xs py-4 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono">
           <div className="flex items-center space-x-3">
             <span className="flex items-center gap-1.5 text-slate-300">
-              <img src="/icon.svg" alt="Avião Vermelho" className="w-4 h-4 object-contain" />
-              <span>AeroCalc Suite PWA</span>
+              <Plane className="w-4 h-4 text-cyan-400" />
+              <span>AeroCalc Suite v2.4</span>
             </span>
             <span className="text-slate-600">|</span>
             <span className="text-slate-400">
@@ -110,12 +106,10 @@ export default function App() {
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-rose-300">
-              ✈ PWA Multiplataforma
-            </span>
+          <div className="flex items-center space-x-4 text-[11px] text-slate-400">
             <span>Cruzeiro: {selectedPreset.cruiseSpeedKt} kt</span>
             <span>Vento Cruzado Máx: {selectedPreset.maxCrosswindKt} kt</span>
+            <span>MTOW: {selectedPreset.mtowLbs} lbs</span>
           </div>
         </div>
       </footer>

@@ -56,7 +56,6 @@ export function analyzeMinutagem(candles: AviatorCandle[], currentTime: Date = n
     }
   }
 
-  // Calculate average, min, max interval between pink candles
   const avgInterval =
     intervals.length > 0
       ? Math.round((intervals.reduce((a, b) => a + b, 0) / intervals.length) * 10) / 10
@@ -106,123 +105,47 @@ export function analyzeMinutagem(candles: AviatorCandle[], currentTime: Date = n
     marketState,
   };
 
-  // Generate projections based on the last pink and current time
+  // Generate projections based on the last pink or current time
   const projections: MinutagemProjection[] = [];
-  const nowMs = currentTime.getTime();
-  const currentMinuteStr = formatMinuteOnly(currentTime);
+  const baseDate = lastPink ? new Date(lastPink.timestamp) : new Date(currentTime);
 
-  const avgDelta = Math.max(3, Math.round(avgInterval));
-  const minDelta = Math.max(2, Math.round(minInterval));
+  // Common Aviator minute intervals after a pink:
+  // 1. Short interval: 3 to 4 min
+  // 2. Medium interval: Average interval (~5-7 min)
+  // 3. Long / Mirror interval: 8 to 11 min
+  const targetDeltas = [
+    Math.max(2, Math.round(minInterval)),
+    Math.max(3, Math.round(avgInterval)),
+    Math.round(avgInterval + 3),
+    Math.round(avgInterval + 6),
+  ];
 
-  const candidateList: Array<{
-    date: Date;
-    reason: string;
-    priority: number;
-  }> = [];
+  // Eliminate duplicates
+  const uniqueDeltas = Array.from(new Set(targetDeltas)).sort((a, b) => a - b);
 
-  if (lastPink) {
-    const lastPinkMs = lastPink.timestamp.getTime();
+  uniqueDeltas.forEach((delta, index) => {
+    const targetDate = new Date(baseDate.getTime() + delta * 60000);
+    // target at 00 seconds
+    targetDate.setSeconds(0, 0);
 
-    // Standard deltas from last pink
-    const standardDeltas = [
-      { d: minDelta, reason: `Ciclo Rápido (+${minDelta} min da última rosa)`, priority: 1 },
-      { d: avgDelta, reason: `Média Histórica (+${avgDelta} min)`, priority: 1 },
-      { d: avgDelta + 3, reason: `Gatilho de Espelhamento (+${avgDelta + 3} min)`, priority: 2 },
-      { d: avgDelta + 6, reason: `Ciclo Longo / Proteção (+${avgDelta + 6} min)`, priority: 3 },
-    ];
-
-    standardDeltas.forEach(({ d, reason, priority }) => {
-      const targetDate = new Date(lastPinkMs + d * 60000);
-      targetDate.setSeconds(0, 0);
-      if (targetDate.getTime() + 59999 >= nowMs) {
-        candidateList.push({ date: targetDate, reason, priority });
-      }
-    });
-
-    // If some standard deltas have passed, project upcoming multiples of the average
-    let k = 1;
-    while (candidateList.length < 5 && k <= 12) {
-      k++;
-      const targetDate = new Date(lastPinkMs + k * avgDelta * 60000);
-      targetDate.setSeconds(0, 0);
-      if (targetDate.getTime() + 59999 >= nowMs) {
-        const deltaFromPink = Math.round((targetDate.getTime() - lastPinkMs) / 60000);
-        candidateList.push({
-          date: targetDate,
-          reason: `Novo Ciclo (+${deltaFromPink} min da última rosa)`,
-          priority: 2,
-        });
-      }
-    }
-  } else {
-    // No pink candle in history yet: project forward relative to now
-    [2, 5, 8, 12].forEach((m, idx) => {
-      const targetDate = new Date(nowMs + m * 60000);
-      targetDate.setSeconds(0, 0);
-      candidateList.push({
-        date: targetDate,
-        reason: idx === 0 ? 'Ciclo Imediato de Entrada' : `Ciclo Padrão (+${m} min)`,
-        priority: idx === 0 ? 1 : 2,
-      });
-    });
-  }
-
-  // Deduplicate by target minute string and filter out expired targets
-  const seenMinutes = new Set<string>();
-  const validCandidates: Array<{ date: Date; reason: string; priority: number }> = [];
-
-  candidateList.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-  candidateList.forEach((cand) => {
-    const minStr = formatMinuteOnly(cand.date);
-    if (!seenMinutes.has(minStr) && cand.date.getTime() + 59999 >= nowMs) {
-      seenMinutes.add(minStr);
-      validCandidates.push(cand);
-    }
-  });
-
-  while (validCandidates.length < 4) {
-    const lastDate =
-      validCandidates.length > 0
-        ? validCandidates[validCandidates.length - 1].date
-        : new Date(nowMs);
-    const nextDate = new Date(lastDate.getTime() + avgDelta * 60000);
-    nextDate.setSeconds(0, 0);
-    const minStr = formatMinuteOnly(nextDate);
-    if (!seenMinutes.has(minStr)) {
-      seenMinutes.add(minStr);
-      validCandidates.push({
-        date: nextDate,
-        reason: `Próximo Ciclo (+${avgDelta} min)`,
-        priority: 2,
-      });
-    }
-  }
-
-  validCandidates.slice(0, 4).forEach((item, index) => {
-    const targetMinute = formatMinuteOnly(item.date);
-    const isActiveNow = targetMinute === currentMinuteStr;
-    const diffSecs = Math.round((item.date.getTime() - nowMs) / 1000);
-    // When minute is active, target has arrived: secondsRemaining is 0, but it remains visible throughout the full minute (until item.date + 60s)
-    const secondsRemaining = isActiveNow ? 0 : Math.max(0, diffSecs);
+    const secondsRemaining = Math.round((targetDate.getTime() - currentTime.getTime()) / 1000);
 
     let confidence: 'Alta' | 'Média' | 'Normal' = 'Normal';
-    if (isActiveNow || item.priority === 1 || (index === 0 && consecutiveBlues >= 3)) {
-      confidence = 'Alta';
-    } else if (index <= 1 || item.priority === 2) {
-      confidence = 'Média';
-    }
-
-    const deltaMinutes = lastPink
-      ? Math.max(1, Math.round((item.date.getTime() - lastPink.timestamp.getTime()) / 60000))
-      : Math.max(1, Math.round((item.date.getTime() - nowMs) / 60000));
+    if (index === 1) confidence = 'Alta';
+    else if (index === 0 && consecutiveBlues >= 3) confidence = 'Alta';
+    else if (index <= 2) confidence = 'Média';
 
     projections.push({
-      targetMinute,
-      deltaMinutes,
+      targetMinute: formatMinuteOnly(targetDate),
+      deltaMinutes: delta,
       secondsRemaining,
       confidence,
-      reason: item.reason,
+      reason:
+        index === 0
+          ? `Ciclo Rápido (+${delta} min da última vela rosa)`
+          : index === 1
+          ? `Média Histórica Calculada (+${delta} min)`
+          : `Gatilho de Espelhamento (+${delta} min)`,
     });
   });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Clock,
   Sparkles,
@@ -36,70 +36,18 @@ import { BetaoMiniHud } from './BetaoMiniHud';
 import { BetaoSyncModal } from './BetaoSyncModal';
 
 export const AviatorMinutagemCalculator: React.FC = () => {
-  const [candles, setCandles] = useState<AviatorCandle[]>(() => {
-    try {
-      const saved = localStorage.getItem('aviator_candles_history_v2');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const list: AviatorCandle[] = parsed.map((c: any) => ({
-            ...c,
-            timestamp: new Date(c.timestamp),
-          }));
-          // If newest candle is within 3 hours, use it!
-          const newest = list[list.length - 1];
-          if (Date.now() - newest.timestamp.getTime() < 1000 * 60 * 180) {
-            return list;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Erro ao carregar histórico local:', e);
-    }
-    return getInitialDemoCandles();
-  });
-
+  const [candles, setCandles] = useState<AviatorCandle[]>(() => getInitialDemoCandles());
   const [nowTime, setNowTime] = useState<Date>(new Date());
   const [inputMultiplier, setInputMultiplier] = useState<string>('');
-  
-  // Auto-radar default to true so it loads automatically on mobile / PWA / browser
-  const [autoSimulate, setAutoSimulate] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('aviator_auto_simulate');
-      return saved !== null ? saved === 'true' : true;
-    } catch {
-      return true;
-    }
-  });
-
-  // Countdown in seconds for the next automatic play / round
-  const [roundProgressSec, setRoundProgressSec] = useState<number>(8);
-  const [lastRoundMultiplier, setLastRoundMultiplier] = useState<number | null>(null);
+  const [autoSimulate, setAutoSimulate] = useState<boolean>(false);
 
   // Real-time Betano sync & sound controls
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('aviator_sound_enabled');
-      return saved !== null ? saved === 'true' : true;
-    } catch {
-      return true;
-    }
-  });
-
-  const [clockOffsetSeconds, setClockOffsetSeconds] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('aviator_clock_offset');
-      return saved ? parseInt(saved, 10) : 0;
-    } catch {
-      return 0;
-    }
-  });
-
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [clockOffsetSeconds, setClockOffsetSeconds] = useState<number>(0);
   const [showBetaoSyncModal, setShowBetaoSyncModal] = useState<boolean>(false);
   const [showMiniHud, setShowMiniHud] = useState<boolean>(false);
   const [quickPasteBetao, setQuickPasteBetao] = useState<string>('');
   const lastSoundRef = useRef<string | null>(null);
-  const lastCandleTimeRef = useRef<number>(Date.now());
 
   // Bankroll management state
   const [bankroll, setBankroll] = useState<number>(200);
@@ -110,65 +58,7 @@ export const AviatorMinutagemCalculator: React.FC = () => {
   const [stopWin, setStopWin] = useState<number>(100);
   const [stopLoss, setStopLoss] = useState<number>(50);
 
-  // Function to generate a new realistic Aviator round
-  const generateNewSimulatedRound = useCallback(() => {
-    const rand = Math.random();
-    let mult = 1.05;
-    if (rand < 0.52) {
-      mult = Math.round((1.01 + Math.random() * 0.98) * 100) / 100;
-    } else if (rand < 0.88) {
-      mult = Math.round((2.0 + Math.random() * 7.99) * 100) / 100;
-    } else if (rand < 0.98) {
-      mult = Math.round((10.0 + Math.random() * 35.0) * 100) / 100;
-    } else {
-      mult = Math.round((50.0 + Math.random() * 90.0) * 100) / 100;
-    }
-
-    const d = new Date(Date.now() + clockOffsetSeconds * 1000);
-    const newCandle: AviatorCandle = {
-      id: `candle-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-      multiplier: mult,
-      timestamp: d,
-      minuteString: formatMinuteOnly(d),
-      timeString: formatTime24(d),
-      isPink: mult >= 10.0,
-    };
-
-    setCandles((prev) => [...prev.slice(-49), newCandle]);
-    setLastRoundMultiplier(mult);
-    lastCandleTimeRef.current = Date.now();
-    setRoundProgressSec(8);
-  }, [clockOffsetSeconds]);
-
-  // Persist candles in localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('aviator_candles_history_v2', JSON.stringify(candles.slice(-50)));
-    } catch (e) {
-      console.warn('Erro ao salvar velas:', e);
-    }
-  }, [candles]);
-
-  // Persist autoSimulate setting
-  useEffect(() => {
-    try {
-      localStorage.setItem('aviator_auto_simulate', String(autoSimulate));
-    } catch (e) {
-      console.warn('Erro ao salvar autoSimulate:', e);
-    }
-  }, [autoSimulate]);
-
-  // Persist sound & offset
-  useEffect(() => {
-    try {
-      localStorage.setItem('aviator_sound_enabled', String(soundEnabled));
-      localStorage.setItem('aviator_clock_offset', String(clockOffsetSeconds));
-    } catch (e) {
-      console.warn('Erro ao salvar configs:', e);
-    }
-  }, [soundEnabled, clockOffsetSeconds]);
-
-  // Live timer tick every 1 second incorporating clock offset and round progress
+  // Live timer tick every 1 second incorporating clock offset
   useEffect(() => {
     const timer = setInterval(() => {
       const base = new Date();
@@ -177,70 +67,56 @@ export const AviatorMinutagemCalculator: React.FC = () => {
       } else {
         setNowTime(base);
       }
-
-      // Decrement round progress if autoSimulate is on
-      if (autoSimulate) {
-        setRoundProgressSec((prev) => {
-          if (prev <= 1) {
-            generateNewSimulatedRound();
-            return 8;
-          }
-          return prev - 1;
-        });
-      }
     }, 1000);
-
     return () => clearInterval(timer);
-  }, [clockOffsetSeconds, autoSimulate, generateNewSimulatedRound]);
+  }, [clockOffsetSeconds]);
 
-  // Handle visibility change and window focus (critical for PWA & mobile background resumption)
+  // Auto simulate next round every 8 seconds if turned on (matching Betano round pace)
   useEffect(() => {
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible') {
-        const base = new Date();
-        setNowTime(new Date(base.getTime() + clockOffsetSeconds * 1000));
-
-        // If app was suspended and more than 15s elapsed, fire a fresh round immediately
-        if (autoSimulate && Date.now() - lastCandleTimeRef.current > 15000) {
-          generateNewSimulatedRound();
-        }
+    if (!autoSimulate) return;
+    const interval = setInterval(() => {
+      // realistic Aviator distribution: ~50% < 2.0x, ~40% 2-9.99x, ~10% >= 10x
+      const rand = Math.random();
+      let mult = 1.05;
+      if (rand < 0.52) {
+        mult = Math.round((1.01 + Math.random() * 0.98) * 100) / 100;
+      } else if (rand < 0.88) {
+        mult = Math.round((2.0 + Math.random() * 7.99) * 100) / 100;
+      } else if (rand < 0.98) {
+        mult = Math.round((10.0 + Math.random() * 35.0) * 100) / 100;
+      } else {
+        mult = Math.round((50.0 + Math.random() * 90.0) * 100) / 100;
       }
-    };
 
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    window.addEventListener('focus', handleVisibilityOrFocus);
+      const d = new Date(Date.now() + clockOffsetSeconds * 1000);
+      const newCandle: AviatorCandle = {
+        id: `candle-${Date.now()}`,
+        multiplier: mult,
+        timestamp: d,
+        minuteString: formatMinuteOnly(d),
+        timeString: formatTime24(d),
+        isPink: mult >= 10.0,
+      };
 
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-    };
-  }, [clockOffsetSeconds, autoSimulate, generateNewSimulatedRound]);
+      setCandles((prev) => [...prev.slice(-49), newCandle]);
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [autoSimulate, clockOffsetSeconds]);
 
   // Run minutagem calculation analysis
   const { stats, projections } = useMemo(() => {
     return analyzeMinutagem(candles, nowTime);
   }, [candles, nowTime]);
 
-  // Format seconds to mm:ss helper
-  const formatCountdown = (secs: number) => {
-    if (secs <= 0) return 'AGORA!';
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  };
-
   // Check if current minute matches any projected target minute
   const currentMinuteStr = formatMinuteOnly(nowTime);
   const currentSecond = nowTime.getSeconds();
 
-  // Find active projection (target minute matches current minute)
   const activeTargetProjection = projections.find((p) => p.targetMinute === currentMinuteStr);
-  // Find upcoming projection that has not started yet
-  const nextClosestProjection = projections.find(
-    (p) => p.targetMinute !== currentMinuteStr && p.secondsRemaining > 0
-  );
+  const nextClosestProjection = projections.find((p) => p.secondsRemaining > 0);
 
-  // Status logic with 12-second precision warning and full-minute active window
+  // Status logic
   let liveStatus: {
     type: 'active' | 'warning' | 'waiting';
     title: string;
@@ -253,24 +129,17 @@ export const AviatorMinutagemCalculator: React.FC = () => {
   };
 
   if (activeTargetProjection) {
-    const secondsLeftInMinute = 60 - currentSecond;
     liveStatus = {
       type: 'active',
-      title: `🚨 MINUTO ALVO ATIVO: :${currentMinuteStr} (RODADA ABERTA)`,
-      desc: `Momento exato de entrada! Janela ativa por mais ${secondsLeftInMinute}s (+${activeTargetProjection.deltaMinutes} min da última rosa). Faça sua aposta de cobertura (1.50x) e caça à rosa (10x+)!`,
+      title: `🚨 MINUTO ALVO ATIVO: ${currentMinuteStr}`,
+      desc: `Momento de entrada calculado pela minutagem (+${activeTargetProjection.deltaMinutes} min da última rosa). Alta probabilidade de vela rosa!`,
       targetMin: currentMinuteStr,
     };
   } else if (nextClosestProjection && nextClosestProjection.secondsRemaining <= 60 && nextClosestProjection.secondsRemaining > 0) {
-    const rem = nextClosestProjection.secondsRemaining;
-    const isExactEntryZone = rem <= 15; // Zona de 12-15s antes do minuto virar
     liveStatus = {
       type: 'warning',
-      title: isExactEntryZone
-        ? `🔥 HORA DE ENTRAR: FALTAM ${rem}s (: ${nextClosestProjection.targetMinute})`
-        : `⚠️ ATENÇÃO: ENTRADA EM ${rem}s`,
-      desc: isExactEntryZone
-        ? `GATILHO DE 12 SEGUNDOS: Prepare o clique de aposta agora para pegar o início exato do minuto :${nextClosestProjection.targetMinute}!`
-        : `Minuto alvo :${nextClosestProjection.targetMinute} iniciando em instantes! Prepare sua aposta dupla de cobertura e rosa.`,
+      title: `⚠️ ATENÇÃO: ENTRADA EM ${nextClosestProjection.secondsRemaining}s`,
+      desc: `Minuto alvo ${nextClosestProjection.targetMinute} iniciando em instantes! Prepare sua aposta dupla de cobertura e rosa.`,
       targetMin: nextClosestProjection.targetMinute,
     };
   }
@@ -287,7 +156,7 @@ export const AviatorMinutagemCalculator: React.FC = () => {
       }
     } else if (liveStatus.type === 'warning' && nextClosestProjection) {
       const rem = nextClosestProjection.secondsRemaining;
-      if (rem === 45 || rem === 30 || rem === 15 || rem === 12 || rem === 5) {
+      if (rem === 45 || rem === 30 || rem === 15 || rem === 5) {
         const triggerKey = `warn-${nextClosestProjection.targetMinute}-${rem}`;
         if (lastSoundRef.current !== triggerKey) {
           lastSoundRef.current = triggerKey;
@@ -353,6 +222,14 @@ export const AviatorMinutagemCalculator: React.FC = () => {
 
   const handleResetDemo = () => {
     setCandles(getInitialDemoCandles());
+  };
+
+  // Format seconds to mm:ss
+  const formatCountdown = (secs: number) => {
+    if (secs <= 0) return 'AGORA!';
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
   // Bet calculations
@@ -428,11 +305,7 @@ export const AviatorMinutagemCalculator: React.FC = () => {
                   Minuto {p.targetMinute}
                 </div>
                 <div className="text-sm font-bold mt-0.5">
-                  {p.targetMinute === currentMinuteStr
-                    ? `${60 - currentSecond}s (ATIVO)`
-                    : p.secondsRemaining > 0
-                    ? formatCountdown(p.secondsRemaining)
-                    : 'AGORA!'}
+                  {p.secondsRemaining > 0 ? formatCountdown(p.secondsRemaining) : 'ENCERRADO'}
                 </div>
                 <div className="text-[9px] text-slate-400 mt-0.5">Confiança: {p.confidence}</div>
               </div>
@@ -861,9 +734,7 @@ export const AviatorMinutagemCalculator: React.FC = () => {
                             : 'text-cyan-300'
                         }`}
                       >
-                        {isTargetNow
-                          ? `${60 - currentSecond}s (ATIVO)`
-                          : formatCountdown(proj.secondsRemaining)}
+                        {isTargetNow ? 'ATIVO AGORA' : formatCountdown(proj.secondsRemaining)}
                       </span>
                     </div>
 
@@ -1031,16 +902,8 @@ export const AviatorMinutagemCalculator: React.FC = () => {
           currentSecond={currentSecond}
           timeString={formatTime24(nowTime)}
           liveStatus={liveStatus}
-          nextTargetMinute={
-            liveStatus.type === 'active'
-              ? currentMinuteStr
-              : nextClosestProjection?.targetMinute
-          }
-          secondsRemaining={
-            liveStatus.type === 'active'
-              ? 60 - currentSecond
-              : nextClosestProjection?.secondsRemaining || 0
-          }
+          nextTargetMinute={nextClosestProjection?.targetMinute}
+          secondsRemaining={nextClosestProjection?.secondsRemaining || 0}
           soundEnabled={soundEnabled}
           onToggleSound={() => {
             setSoundEnabled(!soundEnabled);
