@@ -14,11 +14,11 @@ export default defineConfig(() => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'Aviator Radar PWA - Velas Rosa e Roxa',
-          short_name: 'AviatorRadar',
-          description: 'Radar e calculadora de velas rosa e roxa no Aviator em tempo real com alertas instantâneos.',
-          theme_color: '#0b0f19',
-          background_color: '#0b0f19',
+          name: 'Radar Aviator 82b - Velas Roxas & Rosas',
+          short_name: 'RadarAviator',
+          description: 'Radar em tempo real de velas roxas e rosas do Aviator no padrão 82b.game com minutagens corretas.',
+          theme_color: '#0d0817',
+          background_color: '#06030a',
           display: 'standalone',
           start_url: '/',
           scope: '/',
@@ -59,7 +59,7 @@ export default defineConfig(() => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

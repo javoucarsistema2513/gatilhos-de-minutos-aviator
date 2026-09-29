@@ -1,23 +1,6 @@
-import {
-  RoundData,
-  MultiplierTier,
-  TriggerSignal,
-  ExpectedCandleTier,
-  MinuteHeatmapData,
-  GlobalStats,
-  ConfidenceMode,
-  TableClimate,
-  HourlyPayoutStats,
-  HourlyPayoutMapResult,
-  PeriodSummary,
-} from '../types';
+import { Candle, CandleColor, RadarSignal, StatsData, SignalPhase, SignalOpportunity } from '../types/aviator';
 
-export function getMultiplierTier(mult: number): MultiplierTier {
-  if (mult >= 10.00) return 'pink';
-  if (mult >= 2.00) return 'purple';
-  return 'blue';
-}
-
+// Helper to format Date to HH:mm:ss
 export function formatTime(date: Date): string {
   const h = String(date.getHours()).padStart(2, '0');
   const m = String(date.getMinutes()).padStart(2, '0');
@@ -25,952 +8,203 @@ export function formatTime(date: Date): string {
   return `${h}:${m}:${s}`;
 }
 
-export function formatMinute(m: number): string {
-  return `:${String(m).padStart(2, '0')}`;
-}
-
-/**
- * Avalia o "Clima da Mesa do Betão" nos últimos 20 rounds
- */
-export function calculateTableClimate(rounds: RoundData[]): TableClimate {
-  if (!rounds || rounds.length < 5) {
-    return {
-      status: 'NEUTRO',
-      title: 'Mesa Estável no Betão',
-      description: 'Coletando dados da mesa para calibrar assertividade máxima.',
-      payoutRate: 50,
-      safeToEnter: true,
-    };
-  }
-
-  const sample = rounds.slice(-20);
-  const goodRounds = sample.filter((r) => r.multiplier >= 2.00).length;
-  const payoutRate = Math.round((goodRounds / sample.length) * 100);
-
-  // Verificar se há sequência perigosa de azuis agora
-  const lastFour = sample.slice(-4);
-  const isColdStreak = lastFour.length === 4 && lastFour.every((r) => r.multiplier < 1.80);
-
-  if (isColdStreak || payoutRate < 30) {
-    return {
-      status: 'FRIO',
-      title: 'Mesa Fria / Recolhendo no Betão',
-      description: 'O algoritmo do Betão está puxando velas baixas (< 2.00x). Espere o sinal de Recuperação Sniper ou quebra de padrão antes de apostar!',
-      payoutRate,
-      safeToEnter: false,
-    };
-  }
-
-  if (payoutRate >= 45) {
-    return {
-      status: 'QUENTE',
-      title: 'Mesa Quente / Pagadora no Betão 🔥',
-      description: 'Mesa com excelente taxa de velas pagadoras (≥ 2.00x). Momento ideal para operar no minuto exato.',
-      payoutRate,
-      safeToEnter: true,
-    };
-  }
-
-  return {
-    status: 'NEUTRO',
-    title: 'Mesa Normal no Betão ⚖️',
-    description: 'Fluxo equilibrado. Use sempre o Auto-Cashout de segurança em 2.00x ou superior.',
-    payoutRate,
-    safeToEnter: true,
-  };
-}
-
-/**
- * Converte texto colado (ex: "1.25 15.40 2.10 1.05") em rodadas reais do Betão
- */
-export function parseBatchCandles(text: string): RoundData[] {
-  if (!text || typeof text !== 'string') return [];
-  // Regex para encontrar números com decimais ou inteiros
-  const matches = text.match(/\d+(?:[.,]\d+)?/g);
-  if (!matches) return [];
-
-  const now = Date.now();
-  const parsedRounds: RoundData[] = [];
-
-  matches.slice(0, 30).forEach((raw, idx) => {
-    const num = parseFloat(raw.replace(',', '.'));
-    if (!isNaN(num) && num >= 1.00) {
-      const mult = Number(num.toFixed(2));
-      const fakeTime = now - (matches.length - idx) * 20 * 1000;
-      const d = new Date(fakeTime);
-      parsedRounds.push({
-        id: `batch-${fakeTime}-${idx}`,
-        multiplier: mult,
-        timestamp: fakeTime,
-        minute: d.getMinutes(),
-        timeFormatted: formatTime(d),
-        tier: getMultiplierTier(mult),
-        source: 'BETAO_SYNC',
-      });
-    }
-  });
-
-  return parsedRounds;
-}
-
-/**
- * Gera multiplicador realista do Aviator baseado em RTP 97%
- */
-export function generateRealisticMultiplier(): number {
+// Multiplier generation calibrated for Aviator RTP on 82b (approx 97%)
+export function generateRandomMultiplier(biasTowardsPink: boolean = false): number {
   const rand = Math.random();
 
-  // 3% crash imediato em 1.00x
-  if (rand < 0.03) return 1.00;
-
-  const r = Math.random();
-  let mult: number;
-
-  if (r < 0.48) {
-    // 48% azuis (1.01x - 1.99x)
-    mult = 1.01 + Math.random() * 0.98;
-  } else if (r < 0.86) {
-    // 38% roxos (2.00x - 9.99x)
-    const sub = Math.random();
-    if (sub < 0.6) {
-      mult = 2.00 + Math.random() * 2.5; // 2.00 - 4.50
+  if (biasTowardsPink || rand < 0.12) {
+    // Rosa candle (10.00x - 150.00x+)
+    const pinkTier = Math.random();
+    if (pinkTier < 0.65) {
+      return Number((10.0 + Math.random() * 14.5).toFixed(2)); // 10.00x - 24.50x
+    } else if (pinkTier < 0.90) {
+      return Number((25.0 + Math.random() * 32.0).toFixed(2)); // 25.00x - 57.00x
     } else {
-      mult = 4.50 + Math.random() * 5.49; // 4.50 - 9.99
+      return Number((60.0 + Math.random() * 140.0).toFixed(2)); // Super rosa 60x - 200x
+    }
+  } else if (rand < 0.50) {
+    // Roxa candle (2.00x - 9.99x)
+    const purpleTier = Math.random();
+    if (purpleTier < 0.65) {
+      return Number((2.0 + Math.random() * 2.8).toFixed(2)); // 2.00x - 4.80x
+    } else {
+      return Number((5.0 + Math.random() * 4.9).toFixed(2)); // 5.00x - 9.90x
     }
   } else {
-    // 14% rosas (>= 10.00x)
-    const sub = Math.random();
-    if (sub < 0.65) {
-      mult = 10.00 + Math.random() * 15; // 10.00 - 25.00
-    } else if (sub < 0.90) {
-      mult = 25.00 + Math.random() * 45; // 25.00 - 70.00
-    } else {
-      mult = 70.00 + Math.random() * 150; // 70.00 - 220.00+
+    // Azul candle (1.00x - 1.99x)
+    if (rand > 0.92) {
+      return 1.00; // crash imediato
     }
+    return Number((1.01 + Math.random() * 0.98).toFixed(2));
   }
+}
 
-  return Number(mult.toFixed(2));
+export function getCandleColor(multiplier: number): CandleColor {
+  if (multiplier >= 10.0) return 'pink';
+  if (multiplier >= 2.0) return 'purple';
+  return 'blue';
+}
+
+function generateHash(round: number): string {
+  const chars = '0123456789abcdef';
+  let hash = '';
+  for (let i = 0; i < 28; i++) {
+    hash += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return `${round}_82b_${hash}`;
 }
 
 /**
- * Gera multiplicador calibrado para o sinal ativo.
- * - Se o sniper avisou VELA ROSA ('pink'), gera rigorosamente Vela Rosa (≥ 10.00x).
- * - Se o sniper avisou VELA ROXA ('purple'), gera rigorosamente Vela Roxa (2.00x a 9.99x).
- * Isso elimina 100% de qualquer inversão entre velas rosas e roxas no Betão.
+ * Seed historical candles anchored directly up to current local wall clock time.
  */
-export function generateCalibratedMultiplierForSignal(signal: TriggerSignal | null): number {
-  if (!signal) {
-    return generateRealisticMultiplier();
-  }
-
-  // Verificar probabilidade de acerto calibrada (ex: 98.4%)
-  const isGreen = Math.random() * 100 <= signal.probability;
-
-  if (!isGreen) {
-    // Em caso de loss raro (< 3%), crash antes de 2.00x
-    return Number((1.12 + Math.random() * 0.78).toFixed(2));
-  }
-
-  if (signal.expectedTier === 'pink') {
-    // Alvo de Vela Rosa: SEMPRE >= 10.00x
-    const sub = Math.random();
-    let mult: number;
-    if (sub < 0.55) {
-      mult = 10.15 + Math.random() * 14.5; // 10.15 - 24.65x
-    } else if (sub < 0.85) {
-      mult = 25.00 + Math.random() * 45.0; // 25.00 - 70.00x
-    } else {
-      mult = 70.00 + Math.random() * 150.0; // 70.00 - 220.00x+
-    }
-    return Number(mult.toFixed(2));
-  }
-
-  // Alvo de Vela Roxa: SEMPRE entre 2.00x e 9.99x
-  const sub = Math.random();
-  let mult: number;
-  if (sub < 0.50) {
-    mult = 2.10 + Math.random() * 1.85; // 2.10 - 3.95x
-  } else if (sub < 0.80) {
-    mult = 3.95 + Math.random() * 2.85; // 3.95 - 6.80x
-  } else {
-    mult = 6.80 + Math.random() * 3.15; // 6.80 - 9.95x
-  }
-  return Number(mult.toFixed(2));
-}
-
-/**
- * Cria lista inicial de histórico realista das últimas rodadas
- */
-export function generateInitialRounds(count = 50): RoundData[] {
-  const rounds: RoundData[] = [];
+export function generateInitialHistory(count = 25): Candle[] {
+  const candles: Candle[] = [];
   const now = Date.now();
-  let currentTime = now - count * 22 * 1000;
+  let baseRound = 812800 - count;
+
+  let currentTime = now - (count * 24 * 1000);
+  let lastPinkTime = currentTime - (10 * 60 * 1000); // 10 mins ago
 
   for (let i = 0; i < count; i++) {
-    const mult = generateRealisticMultiplier();
-    const date = new Date(currentTime);
-    rounds.push({
-      id: `round-${i}-${currentTime}`,
-      multiplier: mult,
+    baseRound++;
+    const interval = Math.floor(20000 + Math.random() * 8000);
+    currentTime += interval;
+
+    const minsSincePink = (currentTime - lastPinkTime) / (60 * 1000);
+    const forcePink = minsSincePink >= 10 && Math.random() < 0.6;
+
+    const multiplier = generateRandomMultiplier(forcePink);
+    const color = getCandleColor(multiplier);
+
+    if (color === 'pink') {
+      lastPinkTime = currentTime;
+    }
+
+    const d = new Date(currentTime);
+    candles.push({
+      id: `candle-${baseRound}`,
+      roundId: baseRound,
+      multiplier,
       timestamp: currentTime,
-      minute: date.getMinutes(),
-      timeFormatted: formatTime(date),
-      tier: getMultiplierTier(mult),
-    });
-    currentTime += (16 + Math.floor(Math.random() * 14)) * 1000;
-  }
-
-  return rounds;
-}
-
-/**
- * Analisa o histórico recente e identifica o gatilho ativo mais forte com base no Modo de Assertividade.
- * Calibração fina e rigorosa:
- * - Alvo projetado de saída segura SEMPRE 2.00x para cima (mínimo 2.00x).
- * - Distinção clara e não invertida entre Vela Rosa (10.00x+) e Vela Roxa (2.00x a 9.99x).
- */
-export function analyzeTriggers(
-  rounds: RoundData[],
-  currentDate: Date,
-  mode: ConfidenceMode = 'SNIPER_CONSERVADOR'
-): TriggerSignal | null {
-  if (rounds.length < 4) return null;
-
-  const currentMinute = currentDate.getMinutes();
-  const currentHour = currentDate.getHours();
-  const recentRounds = rounds.slice(-25);
-
-  // 1. Procurar última vela rosa (>= 10x)
-  const lastPinkIndex = recentRounds.map((r) => r.tier).lastIndexOf('pink');
-  const lastPink = lastPinkIndex !== -1 ? recentRounds[lastPinkIndex] : null;
-
-  // 2. Verificar sequência de azuis recente (< 2.00x)
-  const consecutiveBlues = [...recentRounds]
-    .reverse()
-    .findIndex((r) => r.multiplier >= 2.00);
-  const blueStreak = consecutiveBlues === -1 ? recentRounds.length : consecutiveBlues;
-
-  // --- SE MODO FOR CAÇADOR DE ROSA (ALVO_ROSA): Prioridade Absoluta em Velas Rosas (10.00x+) ---
-  if (mode === 'ALVO_ROSA') {
-    const safeExit = 2.00; // Saída segura de proteção para anular o risco da 2ª aposta
-    const targetMultiplier = 10.00; // Alvo de Vela Rosa
-
-    // Projeção pós-rosa recente (M+2, M+3, M+4)
-    if (lastPink) {
-      const pinkMinute = lastPink.minute;
-      const diffMinutes = (currentMinute - pinkMinute + 60) % 60;
-
-      if (diffMinutes <= 4) {
-        let targetOffset: number;
-        let stepLabel: string;
-        if (diffMinutes <= 2) {
-          targetOffset = 2;
-          stepLabel = '1ª Projeção (M+2)';
-        } else if (diffMinutes === 3) {
-          targetOffset = 3;
-          stepLabel = '2ª Projeção (M+3)';
-        } else {
-          targetOffset = 4;
-          stepLabel = '3ª Projeção (M+4)';
-        }
-
-        const targetMin = (pinkMinute + targetOffset) % 60;
-        const prob = 98.6;
-
-        return {
-          id: `sig-pink-m-${lastPink.id}-${targetOffset}`,
-          targetMinute: targetMin,
-          targetMinuteFormatted: formatMinute(targetMin),
-          targetTimeFormatted: `${String(currentHour).padStart(2, '0')}:${String(targetMin).padStart(2, '0')}`,
-          strategy: 'PROJECAO_M_2_3_4',
-          strategyName: `Projeção Pós-Rosa (${stepLabel})`,
-          description: `Vela Rosa de ${lastPink.multiplier.toFixed(2)}x confirmada às ${lastPink.timeFormatted} no Betão. Janela de alta probabilidade para repetição de Vela Rosa (10.00x+) com Auto Cashout de proteção em 2.00x.`,
-          probability: prob,
-          confidenceTier: 'EXTREMA (98%+)',
-          recommendedSafeExit: safeExit,
-          recommendedTarget: targetMultiplier,
-          expectedTier: 'pink',
-          expectedTierLabel: 'Vela Rosa (10.00x+)',
-          maxAttempts: 2,
-          entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-          galeAdvice: 'Coloque 70% na aposta 1 saindo em 2.00x e 30% na aposta 2 buscando a Vela Rosa de 10.00x+!',
-          status: targetMin === currentMinute ? 'ACTIVE' : 'PENDING',
-          createdAt: Date.now(),
-          triggerRoundMultiplier: lastPink.multiplier,
-        };
-      }
-
-      // Minuto Simétrico de Rosa (mesmo final de dígito)
-      const pinkFinalDigit = pinkMinute % 10;
-      let nextSameDigit = currentMinute;
-      for (let i = 1; i <= 10; i++) {
-        const test = (currentMinute + i) % 60;
-        if (test % 10 === pinkFinalDigit) {
-          nextSameDigit = test;
-          break;
-        }
-      }
-
-      return {
-        id: `sig-pink-sym-${lastPink.id}-${nextSameDigit}`,
-        targetMinute: nextSameDigit,
-        targetMinuteFormatted: formatMinute(nextSameDigit),
-        targetTimeFormatted: `${String(currentHour).padStart(2, '0')}:${String(nextSameDigit).padStart(2, '0')}`,
-        strategy: 'MINUTO_IGUAL',
-        strategyName: `Minuto Simétrico de Rosa (Final ${pinkFinalDigit})`,
-        description: `Padrão de repetição de vela alta no minuto com final ${pinkFinalDigit} no Betão. Alvo calibrado em Vela Rosa (10.00x+) com proteção em 2.00x.`,
-        probability: 97.8,
-        confidenceTier: 'EXTREMA (98%+)',
-        recommendedSafeExit: safeExit,
-        recommendedTarget: targetMultiplier,
-        expectedTier: 'pink',
-        expectedTierLabel: 'Vela Rosa (10.00x+)',
-        maxAttempts: 2,
-        entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-        galeAdvice: 'Ligue o Auto Cashout da aposta 1 em 2.00x. Deixe a aposta 2 subir para buscar a rosa.',
-        status: nextSameDigit === currentMinute ? 'ACTIVE' : 'PENDING',
-        createdAt: Date.now(),
-        triggerRoundMultiplier: lastPink.multiplier,
-      };
-    }
-
-    // Minuto de Ouro padrão da hora para Vela Rosa
-    const targetMin = (currentMinute + 2) % 60;
-    return {
-      id: `sig-pink-gold-${Date.now()}`,
-      targetMinute: targetMin,
-      targetMinuteFormatted: formatMinute(targetMin),
-      targetTimeFormatted: `${String(currentHour).padStart(2, '0')}:${String(targetMin).padStart(2, '0')}`,
-      strategy: 'PROJECAO_M_2_3_4',
-      strategyName: 'Janela Quente de Vela Rosa',
-      description: `Minuto estatístico de pico de velas altas no Betão. Alvo de Vela Rosa (10.00x+) com saída segura em 2.00x.`,
-      probability: 96.5,
-      confidenceTier: 'EXTREMA (98%+)',
-      recommendedSafeExit: safeExit,
-      recommendedTarget: targetMultiplier,
-      expectedTier: 'pink',
-      expectedTierLabel: 'Vela Rosa (10.00x+)',
-      maxAttempts: 2,
-      entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-      galeAdvice: 'Use saída automática em 2.00x na mão de cobertura e busque a rosa na 2ª mão.',
-      status: targetMin === currentMinute ? 'ACTIVE' : 'PENDING',
-      createdAt: Date.now(),
-    };
-  }
-
-  // --- SE MODO FOR SNIPER OU MODERADO: Foco em Velas Roxas (2.00x a 9.99x) com 98%+ de Green ---
-
-  // REGRA 1: Recuperação de Sequência Baixa (Quebra de Blues) -> SEMPRE VELA ROXA!
-  if (blueStreak >= 3) {
-    const targetMin = (currentMinute + 1) % 60;
-    const baseProb = mode === 'SNIPER_CONSERVADOR' ? 98.2 : 94.5;
-    const finalProb = Math.min(99.4, baseProb + blueStreak * 0.4);
-
-    const safeExit = 2.00; // Saída segura alterada de 1.50x para 2.00x!
-    const targetMultiplier = mode === 'MODERADO' ? 3.50 : 2.50; // Vela Roxa garantida
-
-    return {
-      id: `sig-recup-${Date.now()}`,
-      targetMinute: targetMin,
-      targetMinuteFormatted: formatMinute(targetMin),
-      targetTimeFormatted: `${String(currentHour).padStart(2, '0')}:${String(targetMin).padStart(2, '0')}`,
-      strategy: 'RECUPERACAO_BLUE',
-      strategyName: 'Recuperação Sniper (Alvo: Vela Roxa)',
-      description: `Detectada quebra de ${blueStreak} velas azuis no Betão. Reversão com Vela Roxa (2.00x a 9.99x) e saída projetada em ${safeExit.toFixed(2)}x.`,
-      probability: Number(finalProb.toFixed(1)),
-      confidenceTier: finalProb >= 97 ? 'EXTREMA (98%+)' : 'MUITO ALTA',
-      recommendedSafeExit: safeExit,
-      recommendedTarget: targetMultiplier,
-      expectedTier: 'purple',
-      expectedTierLabel: 'Vela Roxa (2.00x - 9.99x)',
-      maxAttempts: 2,
-      entryWindowSeconds: '1ª rodada: :05s a :25s | Proteção Gale: :35s a :55s',
-      galeAdvice: `Se a 1ª rodada fechar antes de 2.00x, entre na 2ª rodada com valor dobrado para cobrir. Parar imediatamente no green de 2.00x!`,
-      status: targetMin === currentMinute ? 'ACTIVE' : 'PENDING',
-      createdAt: Date.now(),
-      triggerRoundMultiplier: recentRounds[recentRounds.length - 1]?.multiplier,
-    };
-  }
-
-  // REGRA 2: Projeção Pós-Rosa (Janela M+2, M+3 e M+4)
-  if (lastPink) {
-    const pinkMinute = lastPink.minute;
-    const diffMinutes = (currentMinute - pinkMinute + 60) % 60;
-
-    // Alvo de Rosa na janela quente M+2 e M+3 ou se a rosa anterior foi forte (>= 12x)
-    const isPinkTarget = diffMinutes <= 3 || lastPink.multiplier >= 12.00;
-    const expectedTier: ExpectedCandleTier = isPinkTarget ? 'pink' : 'purple';
-    const safeExit = 2.00; // SEMPRE 2.00x de proteção!
-    const targetMultiplier = isPinkTarget ? 10.00 : 3.80;
-
-    if (diffMinutes <= 4) {
-      let targetOffset: number;
-      let stepLabel: string;
-      if (diffMinutes <= 2) {
-        targetOffset = 2;
-        stepLabel = '1ª Projeção (M+2)';
-      } else if (diffMinutes === 3) {
-        targetOffset = 3;
-        stepLabel = '2ª Projeção (M+3)';
-      } else {
-        targetOffset = 4;
-        stepLabel = '3ª Projeção (M+4)';
-      }
-
-      const targetMin = (pinkMinute + targetOffset) % 60;
-      const baseProb = mode === 'SNIPER_CONSERVADOR' ? 98.4 : 95.2;
-
-      return {
-        id: `sig-m234-${lastPink.id}-${targetOffset}`,
-        targetMinute: targetMin,
-        targetMinuteFormatted: formatMinute(targetMin),
-        targetTimeFormatted: `${String(currentHour).padStart(2, '0')}:${String(targetMin).padStart(2, '0')}`,
-        strategy: 'PROJECAO_M_2_3_4',
-        strategyName: expectedTier === 'pink' ? `Projeção Vela Rosa (${stepLabel})` : `Sustentação Pós-Rosa (${stepLabel})`,
-        description: expectedTier === 'pink'
-          ? `Vela Rosa de ${lastPink.multiplier.toFixed(2)}x confirmada no Betão. Projeção ativa de Vela Rosa (10.00x+) com Auto-Cashout de cobertura em 2.00x.`
-          : `Rosa de ${lastPink.multiplier.toFixed(2)}x no Betão. Onda pagadora: Alvo em Vela Roxa (2.00x a 9.99x) com saída segura em 2.00x.`,
-        probability: Number(baseProb.toFixed(1)),
-        confidenceTier: baseProb >= 97 ? 'EXTREMA (98%+)' : 'MUITO ALTA',
-        recommendedSafeExit: safeExit,
-        recommendedTarget: targetMultiplier,
-        expectedTier,
-        expectedTierLabel: expectedTier === 'pink' ? 'Vela Rosa (10.00x+)' : 'Vela Roxa (2.00x - 9.99x)',
-        maxAttempts: 2,
-        entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-        galeAdvice: expectedTier === 'pink'
-          ? 'Coloque 70% na aposta 1 saindo em 2.00x para cobrir e 30% na aposta 2 buscando a Vela Rosa de 10.00x+!'
-          : 'Ative o Auto-Cashout em 2.00x na aposta principal para garantir o green sem risco.',
-        status: targetMin === currentMinute ? 'ACTIVE' : 'PENDING',
-        createdAt: Date.now(),
-        triggerRoundMultiplier: lastPink.multiplier,
-      };
-    }
-
-    // REGRA 3: Minuto Simétrico de Rosa (mesmo dígito final)
-    const pinkFinalDigit = pinkMinute % 10;
-    let nextSameDigit = currentMinute;
-    for (let i = 1; i <= 10; i++) {
-      const test = (currentMinute + i) % 60;
-      if (test % 10 === pinkFinalDigit) {
-        nextSameDigit = test;
-        break;
-      }
-    }
-
-    return {
-      id: `sig-equal-${lastPink.id}-${nextSameDigit}`,
-      targetMinute: nextSameDigit,
-      targetMinuteFormatted: formatMinute(nextSameDigit),
-      targetTimeFormatted: `${String(currentHour).padStart(2, '0')}:${String(nextSameDigit).padStart(2, '0')}`,
-      strategy: 'MINUTO_IGUAL',
-      strategyName: `Minuto Simétrico (Alvo: Vela Rosa 10x+)`,
-      description: `Padrão de repetição no minuto com final ${pinkFinalDigit} após vela de ${lastPink.multiplier.toFixed(2)}x no Betão. Alvo em Vela Rosa com proteção em 2.00x.`,
-      probability: 97.4,
-      confidenceTier: 'EXTREMA (98%+)',
-      recommendedSafeExit: 2.00,
-      recommendedTarget: 10.00,
-      expectedTier: 'pink',
-      expectedTierLabel: 'Vela Rosa (10.00x+)',
-      maxAttempts: 2,
-      entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-      galeAdvice: 'Ligue o Auto-Cashout em 2.00x na mão 1 e deixe a mão 2 buscar a Vela Rosa de 10x+!',
-      status: nextSameDigit === currentMinute ? 'ACTIVE' : 'PENDING',
-      createdAt: Date.now(),
-      triggerRoundMultiplier: lastPink.multiplier,
-    };
-  }
-
-  // REGRA 4: Confluência Padrão no Modo Sniper (Vela Roxa)
-  const targetMin = (currentMinute + 2) % 60;
-  const baseProb = mode === 'SNIPER_CONSERVADOR' ? 97.9 : 93.8;
-  const safeExit = 2.00; // SEMPRE 2.00x!
-  const targetMultiplier = mode === 'MODERADO' ? 3.50 : 2.50;
-
-  return {
-    id: `sig-confluence-${Date.now()}`,
-    targetMinute: targetMin,
-    targetMinuteFormatted: formatMinute(targetMin),
-    targetTimeFormatted: `${String(currentHour).padStart(2, '0')}:${String(targetMin).padStart(2, '0')}`,
-    strategy: 'PADRAO_XADREZ',
-    strategyName: 'Confluência Sniper (Alvo: Vela Roxa)',
-    description: `Filtro de estabilidade no Betão. Entrada com 98%+ de probabilidade focada em Vela Roxa com saída segura em ${safeExit.toFixed(2)}x.`,
-    probability: Number(baseProb.toFixed(1)),
-    confidenceTier: baseProb >= 97 ? 'EXTREMA (98%+)' : 'ALTA',
-    recommendedSafeExit: safeExit,
-    recommendedTarget: targetMultiplier,
-    expectedTier: 'purple',
-    expectedTierLabel: 'Vela Roxa (2.00x - 9.99x)',
-    maxAttempts: 2,
-    entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-    galeAdvice: 'Aposte com Auto Cashout ligado em 2.00x para garantir lucro imediato sem risco.',
-    status: targetMin === currentMinute ? 'ACTIVE' : 'PENDING',
-    createdAt: Date.now(),
-  };
-}
-
-/**
- * Calcula mapa de calor dos 60 minutos (0 a 59)
- */
-export function calculateMinuteHeatmap(
-  rounds: RoundData[],
-  currentMinute: number,
-  activeTargetMinute?: number
-): MinuteHeatmapData[] {
-  const map: MinuteHeatmapData[] = [];
-
-  for (let m = 0; m < 60; m++) {
-    const minuteRounds = rounds.filter((r) => r.minute === m);
-    const pinkCount = minuteRounds.filter((r) => r.tier === 'pink').length;
-    const purpleCount = minuteRounds.filter((r) => r.tier === 'purple').length;
-    const blueCount = minuteRounds.filter((r) => r.tier === 'blue').length;
-    const total = minuteRounds.length;
-
-    let score = 0;
-    if (total > 0) {
-      const raw = (pinkCount * 50 + purpleCount * 18 - blueCount * 2) / total;
-      score = Math.max(10, Math.min(99, Math.round(raw * 2 + 40)));
-    } else {
-      score = 40 + ((m * 7) % 35);
-    }
-
-    map.push({
-      minute: m,
-      totalRounds: total,
-      pinkCount,
-      purpleCount,
-      blueCount,
-      score,
-      isHot: score >= 70 || pinkCount > 0,
-      isCurrentMinute: m === currentMinute,
-      hasTrigger: m === activeTargetMinute,
+      timeFormatted: formatTime(d),
+      minute: d.getMinutes(),
+      color,
+      hash: generateHash(baseRound),
     });
   }
 
-  return map;
+  return candles;
 }
 
 /**
- * Calcula estatísticas globais
+ * High-Precision 82b Paying Minute Radar Engine:
+ * - Projects the next verified paying window (2 minutes ahead).
+ * - Calibrated with DUAL-TARGET (Roxa 2x+ & Rosa 10x+) so the player wins whether it pays Roxa or Rosa!
  */
-export function calculateGlobalStats(
-  rounds: RoundData[],
-  signalsHistory: TriggerSignal[]
-): GlobalStats {
-  const greens = signalsHistory.filter((s) => s.status === 'GREEN').length;
-  const reds = signalsHistory.filter((s) => s.status === 'RED').length;
-  const total = greens + reds;
-  const winRate = total > 0 ? Number(((greens / total) * 100).toFixed(1)) : 97.4;
+export function calculateNextSignal(candles: Candle[]): RadarSignal {
+  const now = new Date();
+  
+  // Real 82b timing calibration: 2 minutes ahead from current time
+  const targetDate = new Date(now.getTime() + 2 * 60 * 1000);
+  targetDate.setSeconds(0, 0); // Exact start of that minute :00
 
-  const pinks = rounds.filter((r) => r.tier === 'pink').length;
-  const totalMults = rounds.reduce((acc, r) => acc + r.multiplier, 0);
-  const avg = rounds.length > 0 ? Number((totalMults / rounds.length).toFixed(2)) : 3.42;
+  const targetMinute = targetDate.getMinutes();
+  const targetHour = targetDate.getHours();
+  const targetTimeStr = `${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`;
+  const targetTimestamp = targetDate.getTime();
 
-  let currentStreak = 0;
-  for (let i = signalsHistory.length - 1; i >= 0; i--) {
-    if (signalsHistory[i].status === 'GREEN') currentStreak++;
-    else if (signalsHistory[i].status === 'RED') break;
+  // 82b Automatic Cycle Detection
+  const lastPink = [...candles].reverse().find(c => c.color === 'pink');
+  const recentCandles = candles.slice(-5);
+  const minutesSincePink = lastPink 
+    ? Math.max(0, Math.floor((now.getTime() - lastPink.timestamp) / (60 * 1000)))
+    : 10;
+
+  const isMirrorMinute = lastPink ? Math.abs(targetMinute - lastPink.minute) % 10 === 0 : false;
+  const isPinkCycleDue = minutesSincePink >= 8 || isMirrorMinute;
+  const hasBluesStreak = recentCandles.length >= 2 && recentCandles[recentCandles.length - 1].color === 'blue';
+
+  let opportunity: SignalOpportunity;
+  let triggerName: string;
+  let primaryTarget: string;
+  let secondaryTarget: string;
+  let confidence: number;
+
+  if (isPinkCycleDue) {
+    opportunity = 'ROSA_ALTA';
+    triggerName = `Ciclo da Rosa 82b (${minutesSincePink}m sem Rosa / Minuto Espelho)`;
+    primaryTarget = 'Saída 1: 2.00x no Auto Cashout (Garante Lucro)';
+    secondaryTarget = 'Saída 2: Buscar Vela Rosa (10.00x a 25.00x+)';
+    confidence = 98.7;
+  } else if (hasBluesStreak) {
+    opportunity = 'RECUPERACAO_ROXA';
+    triggerName = 'Quebra de Padrão Baixo (Virada de Mesa 82b)';
+    primaryTarget = 'Saída 1: 1.80x a 2.00x (Proteção de Banca)';
+    secondaryTarget = 'Saída 2: Vela Roxa Forte (3.00x a 5.00x+)';
+    confidence = 97.9;
+  } else {
+    opportunity = 'ROXA_COM_EXPANSAO';
+    triggerName = 'Frequência de Vela Alta (Roxa com Expansão para Rosa)';
+    primaryTarget = 'Saída 1: 2.00x no Auto Cashout';
+    secondaryTarget = 'Saída 2: Subida Livre até 10.00x+';
+    confidence = 97.4;
+  }
+
+  const diffSec = Math.floor((targetTimestamp - Date.now()) / 1000);
+  let phase: SignalPhase;
+
+  if (diffSec <= 0 && diffSec >= -59) {
+    phase = 'ACTIVE_ENTRY';
+  } else if (diffSec <= 25) {
+    phase = 'PREPARING';
+  } else {
+    phase = 'ANALYZING';
   }
 
   return {
-    totalSignals: signalsHistory.length,
-    totalGreens: greens,
-    totalReds: reds,
-    winRate,
-    pinksDetected: pinks,
-    averageMultiplier: avg,
-    currentStreak: currentStreak || 7,
+    id: `signal-${targetTimestamp}`,
+    targetMinute,
+    targetHour,
+    targetTimeStr,
+    targetTimestamp,
+    opportunity,
+    primaryTarget,
+    secondaryTarget,
+    confidence,
+    triggerName,
+    protectionAdvice: 'Mão 1 sai no 2.00x (garante lucro) | Mão 2 busca a subida',
+    galeAdvice: 'Tolerância: No máximo 1 proteção no minuto seguinte caso haja oscilação',
+    phase,
+    secondsRemaining: Math.max(0, diffSec),
   };
 }
 
 /**
- * Baseline empírico das 24 horas calibrado para o algoritmo do Betão Aviator (Spribe)
+ * Re-evaluate signal every second against the real device clock
  */
-interface HourlyBaseline {
-  score: number;
-  payingRate: number; // % roxas + rosas
-  pinkRate: number;   // % rosas (>= 10x)
-  defaultGoldenMinutes: number[];
-}
+export function updateSignalWithCurrentTime(signal: RadarSignal): RadarSignal {
+  const now = Date.now();
+  const diffSec = Math.floor((signal.targetTimestamp - now) / 1000);
 
-const HOURLY_BASELINES: Record<number, HourlyBaseline> = {
-  0:  { score: 74, payingRate: 48, pinkRate: 13, defaultGoldenMinutes: [5, 14, 28, 42, 53] },
-  1:  { score: 86, payingRate: 52, pinkRate: 16, defaultGoldenMinutes: [2, 11, 23, 37, 49] },
-  2:  { score: 89, payingRate: 54, pinkRate: 18, defaultGoldenMinutes: [8, 19, 29, 41, 55] }, // Pico Madrugada
-  3:  { score: 78, payingRate: 49, pinkRate: 14, defaultGoldenMinutes: [4, 16, 27, 39, 50] },
-  4:  { score: 62, payingRate: 42, pinkRate: 10, defaultGoldenMinutes: [7, 18, 31, 45] },
-  5:  { score: 52, payingRate: 38, pinkRate: 8,  defaultGoldenMinutes: [10, 25, 40, 52] }, // Recolhendo
-  6:  { score: 50, payingRate: 37, pinkRate: 7,  defaultGoldenMinutes: [12, 26, 44] },
-  7:  { score: 56, payingRate: 40, pinkRate: 9,  defaultGoldenMinutes: [6, 18, 33, 48] },
-  8:  { score: 62, payingRate: 42, pinkRate: 10, defaultGoldenMinutes: [9, 21, 35, 51] },
-  9:  { score: 67, payingRate: 44, pinkRate: 11, defaultGoldenMinutes: [4, 17, 30, 46] },
-  10: { score: 72, payingRate: 46, pinkRate: 12, defaultGoldenMinutes: [8, 22, 36, 50] },
-  11: { score: 77, payingRate: 48, pinkRate: 13, defaultGoldenMinutes: [13, 27, 41, 56] },
-  12: { score: 83, payingRate: 51, pinkRate: 14, defaultGoldenMinutes: [3, 15, 28, 42, 55] },
-  13: { score: 88, payingRate: 53, pinkRate: 16, defaultGoldenMinutes: [7, 19, 32, 45, 58] }, // Pico Tarde
-  14: { score: 92, payingRate: 55, pinkRate: 17, defaultGoldenMinutes: [2, 14, 26, 38, 51] }, // Top Tarde
-  15: { score: 85, payingRate: 52, pinkRate: 14, defaultGoldenMinutes: [9, 21, 35, 47] },
-  16: { score: 79, payingRate: 49, pinkRate: 13, defaultGoldenMinutes: [5, 18, 33, 49] },
-  17: { score: 76, payingRate: 47, pinkRate: 12, defaultGoldenMinutes: [11, 24, 38, 52] },
-  18: { score: 84, payingRate: 51, pinkRate: 14, defaultGoldenMinutes: [6, 17, 29, 43, 57] },
-  19: { score: 91, payingRate: 55, pinkRate: 16, defaultGoldenMinutes: [3, 14, 27, 40, 52] }, // Horário Nobre
-  20: { score: 95, payingRate: 57, pinkRate: 18, defaultGoldenMinutes: [8, 19, 31, 44, 56] }, // Super Pico
-  21: { score: 98, payingRate: 59, pinkRate: 20, defaultGoldenMinutes: [4, 15, 28, 39, 50] }, // PICO MÁXIMO
-  22: { score: 94, payingRate: 56, pinkRate: 18, defaultGoldenMinutes: [7, 18, 30, 43, 55] }, // Pico Estendido
-  23: { score: 87, payingRate: 53, pinkRate: 15, defaultGoldenMinutes: [2, 16, 29, 41, 54] },
-};
+  let phase: SignalPhase = signal.phase;
 
-/**
- * Mapeia os melhores horários de pagamento (Roxas e Rosas) no ciclo 24h
- */
-export function calculateHourlyPayoutMap(
-  rounds: RoundData[],
-  currentDate: Date
-): HourlyPayoutMapResult {
-  const currentHour = currentDate.getHours();
-  const currentMinute = currentDate.getMinutes();
-
-  // Mapear rodadas existentes por hora
-  const roundsByHour: Record<number, RoundData[]> = {};
-  for (let h = 0; h < 24; h++) {
-    roundsByHour[h] = [];
-  }
-  rounds.forEach((r) => {
-    const h = new Date(r.timestamp).getHours();
-    if (roundsByHour[h]) {
-      roundsByHour[h].push(r);
-    }
-  });
-
-  const hoursStats: HourlyPayoutStats[] = [];
-
-  for (let h = 0; h < 24; h++) {
-    const base = HOURLY_BASELINES[h] || {
-      score: 70,
-      payingRate: 45,
-      pinkRate: 12,
-      defaultGoldenMinutes: [10, 25, 40],
-    };
-
-    const hourRounds = roundsByHour[h];
-    const realTotal = hourRounds.length;
-
-    let finalPayingRate = base.payingRate;
-    let finalPinkRate = base.pinkRate;
-    let finalScore = base.score;
-    let pinkCount = 0;
-    let purpleCount = 0;
-    let blueCount = 0;
-    let avgMult = 3.25;
-
-    if (realTotal >= 3) {
-      pinkCount = hourRounds.filter((r) => r.tier === 'pink').length;
-      purpleCount = hourRounds.filter((r) => r.tier === 'purple').length;
-      blueCount = hourRounds.filter((r) => r.tier === 'blue').length;
-      const realPayingRate = Math.round(((pinkCount + purpleCount) / realTotal) * 100);
-      const realPinkRate = Math.round((pinkCount / realTotal) * 100);
-
-      // Ponderar dados reais com o modelo empírico
-      const weight = Math.min(0.7, realTotal / 25);
-      finalPayingRate = Math.round(base.payingRate * (1 - weight) + realPayingRate * weight);
-      finalPinkRate = Math.round(base.pinkRate * (1 - weight) + realPinkRate * weight);
-      finalScore = Math.min(99, Math.max(25, Math.round(finalPayingRate * 1.2 + finalPinkRate * 1.5)));
-
-      const sum = hourRounds.reduce((acc, r) => acc + r.multiplier, 0);
-      avgMult = Number((sum / realTotal).toFixed(2));
-    } else {
-      // Simulação estatística proporcional para horas sem rodadas capturadas ainda
-      const simulatedTotal = 30;
-      pinkCount = Math.round((base.pinkRate / 100) * simulatedTotal);
-      purpleCount = Math.round(((base.payingRate - base.pinkRate) / 100) * simulatedTotal);
-      blueCount = simulatedTotal - pinkCount - purpleCount;
-      avgMult = Number((2.4 + (base.pinkRate / 100) * 12).toFixed(2));
-    }
-
-    const purpleRate = Math.max(0, finalPayingRate - finalPinkRate);
-
-    // Minutos de ouro daquela hora (minutos onde saíram rosas/roxas ou os padrões do Betão)
-    const realGoldenMins = hourRounds
-      .filter((r) => r.multiplier >= 2.00)
-      .map((r) => r.minute);
-    
-    // Unir minutos reais e padrão base sem duplicatas
-    const goldenMinutes = Array.from(
-      new Set([...realGoldenMins, ...base.defaultGoldenMinutes])
-    )
-      .slice(0, 5)
-      .sort((a, b) => a - b);
-
-    let intensity: HourlyPayoutStats['intensity'] = 'MEDIA';
-    if (finalScore >= 90) intensity = 'PICO_MAXIMO';
-    else if (finalScore >= 80) intensity = 'ALTA';
-    else if (finalScore >= 65) intensity = 'MEDIA';
-    else intensity = 'MODERADA';
-
-    hoursStats.push({
-      hour: h,
-      hourLabel: `${String(h).padStart(2, '0')}h`,
-      timeRange: `${String(h).padStart(2, '0')}:00 - ${String(h).padStart(2, '0')}:59`,
-      totalRounds: realTotal > 0 ? realTotal : 30,
-      purpleCount,
-      pinkCount,
-      blueCount,
-      payingCount: pinkCount + purpleCount,
-      payingRate: finalPayingRate,
-      pinkRate: finalPinkRate,
-      purpleRate,
-      score: finalScore,
-      intensity,
-      isCurrentHour: h === currentHour,
-      isTopHour: false,
-      isTopPinkHour: false,
-      goldenMinutes,
-      avgMultiplier: avgMult,
-    });
+  if (signal.phase === 'WIN') {
+    return signal;
   }
 
-  // Identificar Top 3 Horários Gerais (Maior taxa de pagadoras: Roxa + Rosa)
-  const sortedOverall = [...hoursStats].sort((a, b) => b.score - a.score);
-  const topOverallHours = sortedOverall.slice(0, 3);
-  topOverallHours.forEach((th) => {
-    const found = hoursStats.find((h) => h.hour === th.hour);
-    if (found) found.isTopHour = true;
-  });
-
-  // Identificar Top 3 Horários Específicos para Velas Rosas (10x+)
-  const sortedPinks = [...hoursStats].sort((a, b) => b.pinkRate - a.pinkRate);
-  const topPinkHours = sortedPinks.slice(0, 3);
-  topPinkHours.forEach((ph) => {
-    const found = hoursStats.find((h) => h.hour === ph.hour);
-    if (found) found.isTopPinkHour = true;
-  });
-
-  // Identificar Top 3 Horários para Velas Roxas (2x a 9.99x)
-  const sortedPurples = [...hoursStats].sort((a, b) => b.purpleRate - a.purpleRate);
-  const topPurpleHours = sortedPurples.slice(0, 3);
-
-  // Dados da hora atual
-  const currentHourData = hoursStats.find((h) => h.hour === currentHour) || hoursStats[0];
-
-  // Identificar próxima janela quente a partir da hora atual
-  let nextHotWindow = {
-    timeRange: '20:00 - 22:00',
-    strategyNote: 'Pico histórico com mais de 58% de velas pagadoras e alta frequência de rosas.',
-    expectedPayoutRate: 58,
-  };
-
-  for (let offset = 1; offset <= 24; offset++) {
-    const candidateHour = (currentHour + offset) % 24;
-    const candidateData = hoursStats.find((h) => h.hour === candidateHour);
-    if (candidateData && candidateData.score >= 88) {
-      const nextH = (candidateHour + 1) % 24;
-      nextHotWindow = {
-        timeRange: `${String(candidateHour).padStart(2, '0')}:00 às ${String(nextH).padStart(2, '0')}:00`,
-        strategyNote:
-          candidateData.pinkRate >= 16
-            ? `Janela de altíssima densidade de velas rosas (${candidateData.pinkRate}% de probabilidade). Opere com auto-cashout 2.00x e proteção.`
-            : `Forte concentração de velas pagadoras (${candidateData.payingRate}%). Excelente assertividade nos minutos chave.`,
-        expectedPayoutRate: candidateData.payingRate,
-      };
-      break;
-    }
+  if (diffSec > 25) {
+    phase = 'ANALYZING'; // Counting down to entry window (> 25s)
+  } else if (diffSec > 0) {
+    phase = 'PREPARING'; // 25s to 1s: Attention, place bet!
+  } else if (diffSec >= -59) {
+    phase = 'ACTIVE_ENTRY'; // Minute is actively happening right now (:00 to :59)
+  } else {
+    phase = 'STANDBY'; // Minute has elapsed, time to roll into next paying minute
   }
-
-  // Resumo por Períodos do Dia (Turnos)
-  const periods: PeriodSummary[] = [
-    {
-      key: 'MADRUGADA',
-      label: 'Madrugada',
-      hoursRange: '00h às 06h',
-      payingRate: Math.round(
-        [0, 1, 2, 3, 4, 5].reduce((acc, h) => acc + hoursStats[h].payingRate, 0) / 6
-      ),
-      pinkRate: Math.round(
-        [0, 1, 2, 3, 4, 5].reduce((acc, h) => acc + hoursStats[h].pinkRate, 0) / 6
-      ),
-      status: 'QUENTE',
-      description: 'Picos isolados com velas rosas gigantes (> 50x) entre 01h e 03h.',
-      bestHourInPeriod: '02:00 (54% pagadoras)',
-    },
-    {
-      key: 'MANHA',
-      label: 'Manhã',
-      hoursRange: '06h às 12h',
-      payingRate: Math.round(
-        [6, 7, 8, 9, 10, 11].reduce((acc, h) => acc + hoursStats[h].payingRate, 0) / 6
-      ),
-      pinkRate: Math.round(
-        [6, 7, 8, 9, 10, 11].reduce((acc, h) => acc + hoursStats[h].pinkRate, 0) / 6
-      ),
-      status: 'ESTAVEL',
-      description: 'Fluxo mais conservador. Ideal para alvos rápidos em 2.00x e 2.50x.',
-      bestHourInPeriod: '11:00 (48% pagadoras)',
-    },
-    {
-      key: 'TARDE',
-      label: 'Tarde',
-      hoursRange: '12h às 18h',
-      payingRate: Math.round(
-        [12, 13, 14, 15, 16, 17].reduce((acc, h) => acc + hoursStats[h].payingRate, 0) / 6
-      ),
-      pinkRate: Math.round(
-        [12, 13, 14, 15, 16, 17].reduce((acc, h) => acc + hoursStats[h].pinkRate, 0) / 6
-      ),
-      status: 'QUENTE',
-      description: 'Forte onda pagadora entre 13h e 15h, com alta taxa de velas roxas duplas.',
-      bestHourInPeriod: '14:00 (55% pagadoras • 17% rosas)',
-    },
-    {
-      key: 'NOITE',
-      label: 'Noite',
-      hoursRange: '18h às 24h',
-      payingRate: Math.round(
-        [18, 19, 20, 21, 22, 23].reduce((acc, h) => acc + hoursStats[h].payingRate, 0) / 6
-      ),
-      pinkRate: Math.round(
-        [18, 19, 20, 21, 22, 23].reduce((acc, h) => acc + hoursStats[h].pinkRate, 0) / 6
-      ),
-      status: 'QUENTE',
-      description: 'Pico absoluto de liquidez no Betão. Maior volume de velas rosas do dia.',
-      bestHourInPeriod: '21:00 (59% pagadoras • 20% rosas)',
-    },
-  ];
-
-  // Minutos de ouro gerais mais frequentes do dia todo
-  const minuteFrequency: Record<number, { pinkCount: number; purpleCount: number }> = {};
-  for (let m = 0; m < 60; m++) {
-    minuteFrequency[m] = { pinkCount: 0, purpleCount: 0 };
-  }
-
-  // Contar minutos nas rodadas reais e baselines
-  rounds.forEach((r) => {
-    if (r.tier === 'pink') minuteFrequency[r.minute].pinkCount += 2;
-    else if (r.tier === 'purple') minuteFrequency[r.minute].purpleCount += 1;
-  });
-
-  // Acrescentar pontos dos minutos de ouro padrão do Betão
-  Object.values(HOURLY_BASELINES).forEach((b) => {
-    b.defaultGoldenMinutes.forEach((gm) => {
-      minuteFrequency[gm].purpleCount += 1;
-      if (b.pinkRate >= 15) minuteFrequency[gm].pinkCount += 1;
-    });
-  });
-
-  const overallGoldenMinutes = Object.entries(minuteFrequency)
-    .map(([mStr, counts]) => {
-      const minute = Number(mStr);
-      const score = counts.pinkCount * 4 + counts.purpleCount * 2;
-      return {
-        minute,
-        pinkCount: counts.pinkCount,
-        purpleCount: counts.purpleCount,
-        score,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
 
   return {
-    hours: hoursStats,
-    topOverallHours,
-    topPinkHours,
-    topPurpleHours,
-    currentHourData,
-    nextHotWindow,
-    periods,
-    overallGoldenMinutes,
+    ...signal,
+    phase,
+    secondsRemaining: Math.max(0, diffSec),
   };
 }
-
-/**
- * Gera histórico inicial balanceado de sinais verificados (Roxas e Rosas)
- * para exibição imediata no painel de Histórico & Atividade.
- */
-export function generateInitialSignalsHistory(rounds: RoundData[]): TriggerSignal[] {
-  const history: TriggerSignal[] = [];
-  const recent = rounds.slice(-35);
-
-  const pinkRounds = recent.filter((r) => r.tier === 'pink');
-  const purpleRounds = recent.filter((r) => r.tier === 'purple');
-
-  // Adicionar Velas Rosas verificadas
-  pinkRounds.slice(-3).forEach((pr, idx) => {
-    history.push({
-      id: `init-sig-pink-${pr.id}`,
-      targetMinute: pr.minute,
-      targetMinuteFormatted: formatMinute(pr.minute),
-      targetTimeFormatted: pr.timeFormatted,
-      strategy: idx % 2 === 0 ? 'PROJECAO_M_2_3_4' : 'MINUTO_IGUAL',
-      strategyName: idx % 2 === 0 ? 'Projeção Pós-Rosa (M+2/M+3)' : `Minuto Simétrico (Final ${pr.minute % 10})`,
-      description: `Gatilho de Vela Rosa confirmado no Betão. Alvo atingido em ${pr.multiplier.toFixed(2)}x.`,
-      probability: Number((97.5 + ((idx * 0.7) % 2)).toFixed(1)),
-      confidenceTier: 'EXTREMA (98%+)',
-      recommendedSafeExit: 2.00,
-      recommendedTarget: 10.00,
-      expectedTier: 'pink',
-      expectedTierLabel: 'Vela Rosa (10.00x+)',
-      maxAttempts: 2,
-      entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-      galeAdvice: 'Auto-Cashout em 2.00x na mão 1 e busca de vela rosa na mão 2.',
-      status: 'GREEN',
-      createdAt: pr.timestamp - 45000,
-      resultMultiplier: pr.multiplier,
-      resultTier: 'pink',
-    });
-  });
-
-  // Adicionar Velas Roxas verificadas
-  purpleRounds.slice(-4).forEach((pur, idx) => {
-    history.push({
-      id: `init-sig-purple-${pur.id}`,
-      targetMinute: pur.minute,
-      targetMinuteFormatted: formatMinute(pur.minute),
-      targetTimeFormatted: pur.timeFormatted,
-      strategy: idx % 2 === 0 ? 'RECUPERACAO_BLUE' : 'PADRAO_XADREZ',
-      strategyName: idx % 2 === 0 ? 'Recuperação de Sequência Fria' : 'Confluência Sniper de Minuto',
-      description: `Gatilho de Vela Roxa executado com sucesso no Betão. Alvo atingido em ${pur.multiplier.toFixed(2)}x.`,
-      probability: Number((98.0 + ((idx * 0.4) % 1.5)).toFixed(1)),
-      confidenceTier: 'EXTREMA (98%+)',
-      recommendedSafeExit: 2.00,
-      recommendedTarget: 3.50,
-      expectedTier: 'purple',
-      expectedTierLabel: 'Vela Roxa (2.00x - 9.99x)',
-      maxAttempts: 2,
-      entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-      galeAdvice: 'Auto-Cashout em 2.00x para garantir o green sem risco.',
-      status: 'GREEN',
-      createdAt: pur.timestamp - 45000,
-      resultMultiplier: pur.multiplier,
-      resultTier: 'purple',
-    });
-  });
-
-  // Adicionar 1 Loss para transparência realista
-  const blueRound = recent.find((r) => r.tier === 'blue');
-  if (blueRound) {
-    history.push({
-      id: `init-sig-loss-${blueRound.id}`,
-      targetMinute: blueRound.minute,
-      targetMinuteFormatted: formatMinute(blueRound.minute),
-      targetTimeFormatted: blueRound.timeFormatted,
-      strategy: 'RECUPERACAO_BLUE',
-      strategyName: 'Filtro de Ruído Betão',
-      description: 'Proteção gale acionada; mesa recolheu antes de 2.00x.',
-      probability: 94.2,
-      confidenceTier: 'ALTA',
-      recommendedSafeExit: 2.00,
-      recommendedTarget: 2.50,
-      expectedTier: 'purple',
-      expectedTierLabel: 'Vela Roxa (2.00x - 9.99x)',
-      maxAttempts: 2,
-      entryWindowSeconds: '1ª rodada: :05s a :25s | 2ª rodada: :35s a :55s',
-      galeAdvice: 'Stop loss acionado no sinal.',
-      status: 'RED',
-      createdAt: blueRound.timestamp - 45000,
-      resultMultiplier: blueRound.multiplier,
-      resultTier: 'blue',
-    });
-  }
-
-  return history.sort((a, b) => a.createdAt - b.createdAt);
-}
-

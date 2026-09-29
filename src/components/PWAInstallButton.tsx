@@ -1,29 +1,32 @@
 import React, { useState } from 'react';
+import { Plane, Download, Share, PlusSquare, X } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { Download, Share2, Smartphone, X } from 'lucide-react';
 
 export const PWAInstallButton: React.FC = () => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
-  const [showGenericGuide, setShowGenericGuide] = useState(false);
-
-  // If already running as an installed PWA, hide the button
+  // If already running inside installed standalone PWA app, hide button
   if (isInstalled) {
-    return null;
+    return (
+      <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-semibold text-emerald-400">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>App Instalado</span>
+      </div>
+    );
   }
 
   // Chromium / Android / Desktop flow
   if (isInstallable) {
     return (
       <button
-        id="btn-install-pwa"
         onClick={install}
-        className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 p-2 sm:px-3 sm:py-1.5 text-xs font-bold text-white shadow-md shadow-pink-600/30 hover:from-pink-500 hover:to-purple-500 transition-all active:scale-95 shrink-0"
-        title="Instalar App no dispositivo"
+        className="group relative flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 via-pink-600 to-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-rose-900/40 hover:from-rose-500 hover:to-purple-500 hover:shadow-rose-600/30 transition-all duration-200 active:scale-95 cursor-pointer border border-rose-400/30"
+        title="Instalar App Radar Aviator no seu celular ou computador"
       >
-        <Download className="w-3.5 h-3.5" />
-        <span className="hidden md:inline">Instalar App</span>
+        <Plane className="w-4 h-4 text-white -rotate-45 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+        <span className="tracking-wide">Instalar App</span>
+        <Download className="w-3.5 h-3.5 opacity-80" />
       </button>
     );
   }
@@ -33,62 +36,51 @@ export const PWAInstallButton: React.FC = () => {
     return (
       <>
         <button
-          id="btn-install-ios"
           onClick={() => setShowIOSGuide(true)}
-          className="flex items-center gap-1.5 rounded-xl border border-purple-500/40 bg-purple-950/40 p-2 sm:px-2.5 sm:py-1.5 text-xs font-semibold text-purple-200 hover:bg-purple-900/50 transition-all shrink-0"
-          title="Instalar no iPhone"
+          className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-900/60 to-rose-900/60 border border-rose-500/40 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-900/40 transition-all cursor-pointer shadow-md"
         >
-          <Smartphone className="w-3.5 h-3.5 text-pink-400" />
-          <span className="hidden md:inline">Instalar no iOS</span>
+          <Plane className="w-3.5 h-3.5 text-rose-400 -rotate-45" />
+          <span>Instalar no iPhone</span>
         </button>
 
         {showIOSGuide && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-700 p-5 shadow-2xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2.5">
-                  <img src="/pwa-192x192.png" alt="Aviator Radar VIP" className="w-7 h-7 rounded-lg border border-pink-500/40 object-cover" />
-                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-pink-500" />
-                    Instalar no iPhone / iPad
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setShowIOSGuide(false)}
-                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="mt-4 space-y-2.5 text-xs text-slate-300">
-                <div className="flex items-start gap-2.5 bg-slate-800/60 p-2.5 rounded-xl">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pink-500/20 text-xs font-bold text-pink-400">
-                    1
-                  </span>
-                  <p>
-                    Toque no botão <strong className="text-white inline-flex items-center gap-1"><Share2 className="w-3 h-3 text-blue-400" /> Compartilhar</strong> no Safari.
-                  </p>
-                </div>
-                <div className="flex items-start gap-2.5 bg-slate-800/60 p-2.5 rounded-xl">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs font-bold text-purple-400">
-                    2
-                  </span>
-                  <p>
-                    Role para baixo e toque em <strong className="text-white">Adicionar à Tela de Início</strong>.
-                  </p>
-                </div>
-                <div className="flex items-start gap-2.5 bg-slate-800/60 p-2.5 rounded-xl">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-xs font-bold text-emerald-400">
-                    3
-                  </span>
-                  <p>
-                    Toque em <strong className="text-emerald-400">Adicionar</strong> para rodar como aplicativo nativo.
-                  </p>
-                </div>
-              </div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="w-full max-w-sm rounded-2xl bg-[#120a21] border border-rose-500/30 p-6 shadow-2xl text-slate-100 relative">
               <button
                 onClick={() => setShowIOSGuide(false)}
-                className="mt-4 w-full rounded-xl bg-slate-800 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition"
+                className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-rose-600/20 border border-rose-500/40 flex items-center justify-center p-2">
+                  <img src="/icon.svg" alt="Aviator Icon" className="w-full h-full object-contain" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Instalar Radar Aviator</h3>
+                  <p className="text-xs text-rose-300">PWA com ícone de avião na tela de início</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-300 bg-slate-900/60 rounded-xl p-3.5 border border-slate-800">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 font-bold">1</div>
+                  <p>No Safari, toque no botão <strong className="text-white inline-flex items-center gap-1"><Share className="w-3.5 h-3.5 text-sky-400" /> Compartilhar</strong> na barra inferior.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 font-bold">2</div>
+                  <p>Role a tela e toque em <strong className="text-white inline-flex items-center gap-1"><PlusSquare className="w-3.5 h-3.5 text-emerald-400" /> Adicionar à Tela de Início</strong>.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 font-bold">3</div>
+                  <p>Toque em <strong>Adicionar</strong> no canto superior direito para fixar o ícone do Avião.</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowIOSGuide(false)}
+                className="mt-5 w-full rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 text-xs font-bold text-white transition shadow-lg shadow-rose-900/50"
               >
                 Entendido
               </button>
@@ -99,56 +91,17 @@ export const PWAInstallButton: React.FC = () => {
     );
   }
 
+  // Fallback for browsers that haven't fired beforeinstallprompt yet or already available
   return (
-    <>
-      <button
-        id="btn-install-shortcut"
-        onClick={() => setShowGenericGuide(true)}
-        className="flex items-center gap-1 rounded-xl border border-pink-500/30 bg-pink-950/20 p-2 sm:px-2.5 sm:py-1.5 text-xs font-medium text-pink-300 hover:bg-pink-950/40 transition shrink-0"
-        title="Instalar aplicativo no celular ou PC"
-      >
-        <Download className="w-3.5 h-3.5" />
-        <span className="hidden md:inline">Instalar</span>
-      </button>
-
-      {showGenericGuide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-700 p-5 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <img src="/pwa-192x192.png" alt="Aviator Radar VIP" className="w-7 h-7 rounded-lg border border-pink-500/40 object-cover" />
-                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <Download className="w-4 h-4 text-pink-500" />
-                  Como Instalar o App
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowGenericGuide(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="mt-3 space-y-2 text-xs text-slate-300">
-              <p>
-                • <strong>No Android/Chrome:</strong> Toque no menu do navegador (três pontinhos no topo) e escolha <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.
-              </p>
-              <p>
-                • <strong>No iPhone/Safari:</strong> Toque em Compartilhar e selecione <strong>"Adicionar à Tela de Início"</strong>.
-              </p>
-              <p>
-                • <strong>No Computador:</strong> Clique no ícone de download/instalação na barra de endereço do navegador.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowGenericGuide(false)}
-              className="mt-4 w-full rounded-xl bg-pink-600 py-2 text-xs font-bold text-white hover:bg-pink-500 transition"
-            >
-              OK, Entendido
-            </button>
-          </div>
-        </div>
-      )}
-    </>
+    <button
+      onClick={() => {
+        alert('Para instalar: no menu do navegador (três pontinhos), clique em "Instalar aplicativo" ou "Adicionar à tela inicial"');
+      }}
+      className="flex items-center gap-1.5 rounded-xl bg-rose-950/60 border border-rose-500/30 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-900/40 transition cursor-pointer"
+      title="Instalar como aplicativo PWA com ícone de avião"
+    >
+      <Plane className="w-3.5 h-3.5 text-rose-400 -rotate-45" />
+      <span>Instalar App</span>
+    </button>
   );
 };

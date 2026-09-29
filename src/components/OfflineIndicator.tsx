@@ -1,6 +1,26 @@
-import React from 'react';
-import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import React, { useEffect, useState } from 'react';
 import { WifiOff } from 'lucide-react';
+
+export function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  return isOnline;
+}
 
 export const OfflineIndicator: React.FC = () => {
   const isOnline = useOnlineStatus();
@@ -8,12 +28,9 @@ export const OfflineIndicator: React.FC = () => {
   if (isOnline) return null;
 
   return (
-    <div
-      id="pwa-offline-indicator"
-      className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-xl bg-amber-500/95 backdrop-blur-md px-3.5 py-2 text-xs font-semibold text-slate-950 shadow-xl border border-amber-400"
-    >
-      <WifiOff className="w-4 h-4 text-slate-950 animate-pulse" />
-      <span>Modo Offline — Utilizando dados e cálculos em cache local</span>
+    <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-xl bg-amber-600/90 border border-amber-400/40 px-3.5 py-2 text-xs font-semibold text-white shadow-2xl backdrop-blur-md animate-pulse">
+      <WifiOff className="w-4 h-4 text-amber-200" />
+      <span>Modo Offline — O Radar continua operando com cache local.</span>
     </div>
   );
 };

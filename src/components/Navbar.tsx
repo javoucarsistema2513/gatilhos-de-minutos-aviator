@@ -1,137 +1,127 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Volume2, VolumeX, Bell, BellOff, HelpCircle, Activity } from 'lucide-react';
+import { soundFx } from '../utils/audio';
 import { PWAInstallButton } from './PWAInstallButton';
-import { Bell, Plane, RefreshCw, Volume2, VolumeX } from 'lucide-react';
 
 interface NavbarProps {
-  soundEnabled: boolean;
-  setSoundEnabled: (enabled: boolean) => void;
-  unreadNotificationsCount: number;
-  isSimulating: boolean;
-  setIsSimulating: (sim: boolean) => void;
-  onOpenSyncModal: () => void;
-  onOpenNotificationsModal: () => void;
+  onOpenGuide: () => void;
+  isMuted: boolean;
+  onToggleMute: () => void;
+  notificationsEnabled: boolean;
+  onToggleNotifications: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  soundEnabled,
-  setSoundEnabled,
-  unreadNotificationsCount,
-  isSimulating,
-  setIsSimulating,
-  onOpenSyncModal,
-  onOpenNotificationsModal,
+  onOpenGuide,
+  isMuted,
+  onToggleMute,
+  notificationsEnabled,
+  onToggleNotifications,
 }) => {
+  const [currentTime, setCurrentTime] = useState<string>('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      setCurrentTime(`${h}:${m}:${s}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-2.5 py-2 sm:px-6 sm:py-2.5">
-        {/* Brand Logo */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-slate-900 border border-pink-500/50 shadow-md shadow-pink-600/30 overflow-hidden">
-            <img
-              src="/pwa-192x192.png"
-              alt="Aviator Radar VIP"
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                const target = e.currentTarget as HTMLImageElement;
-                if (!target.src.endsWith('/icon.svg')) {
-                  target.src = '/icon.svg';
-                }
-              }}
-            />
-            <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5 sm:h-3 sm:w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
-              <span className="relative inline-flex h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-pink-500"></span>
+    <header className="sticky top-0 z-40 w-full border-b border-rose-950/60 bg-[#0b0614]/90 backdrop-blur-md px-3 sm:px-6 py-2.5">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+        {/* Logo and Brand */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="relative group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-600 to-purple-800 p-0.5 shadow-lg shadow-rose-950/60 flex items-center justify-center">
+              <div className="w-full h-full bg-[#120824] rounded-[10px] flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/icon.svg" 
+                  alt="Aviator Airplane Icon" 
+                  className="w-7 h-7 object-contain group-hover:scale-110 transition-transform" 
+                />
+              </div>
+            </div>
+            <span className="absolute -bottom-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
             </span>
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <Plane className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500 fill-rose-500/30 -rotate-12 shrink-0 animate-pulse" />
-              <h1 className="text-xs sm:text-base font-black tracking-tight text-white truncate">
-                AVIATOR <span className="bg-gradient-to-r from-pink-500 to-purple-400 bg-clip-text text-transparent">RADAR VIP</span>
+
+          <div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="text-sm sm:text-base font-black tracking-wider text-white uppercase flex items-center gap-1">
+                <span className="text-rose-500">RADAR</span> AVIATOR
               </h1>
-              <span className="hidden xs:inline-flex rounded border border-pink-500/40 bg-pink-500/20 px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black text-pink-300 uppercase">
-                ROXA & ROSA
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-black tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                82B.GAME
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 hidden sm:block truncate">
-              Previsão Cirúrgica da Próxima Vela (Roxa 2x+ ou Rosa 10x+)
+            <p className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5">
+              <Activity className="w-3 h-3 text-emerald-400 inline" />
+              <span>ALGORITMO DE VELAS ROXAS & ROSAS</span>
             </p>
           </div>
         </div>
 
-        {/* Right Actions: Sincronizar Mesa, Live/Simulation toggle, Notifications, Sound toggle, PWA Install */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* Synchronize Table Button */}
-          <button
-            id="btn-navbar-sync-table"
-            onClick={onOpenSyncModal}
-            className="flex items-center gap-1.5 rounded-xl border border-pink-500/60 bg-gradient-to-r from-pink-600 to-purple-600 p-2 sm:px-3 sm:py-1.5 text-xs font-black text-white shadow-md shadow-pink-600/20 hover:brightness-110 transition active:scale-95 shrink-0"
-            title="Sincronizar sequência de velas do Aviator oficial"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">Sincronizar Mesa</span>
-          </button>
+        {/* Center: Live Clock & Sync indicator */}
+        <div className="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-[#140b29] border border-rose-950/80">
+          <div className="flex flex-col text-right">
+            <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Hora Oficial (Sync)</span>
+            <span className="text-sm font-black font-mono text-white tracking-widest">{currentTime || '--:--:--'}</span>
+          </div>
+          <div className="h-6 w-px bg-slate-800"></div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wide">AO VIVO</span>
+          </div>
+        </div>
 
-          {/* Mode Switch: Real Table vs Training Simulation */}
+        {/* Action Controls & PWA Button */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Audio toggle */}
           <button
-            id="btn-toggle-simulation"
-            onClick={() => setIsSimulating(!isSimulating)}
-            className={`flex items-center gap-1.5 rounded-xl p-2 sm:px-2.5 sm:py-1.5 text-xs font-bold border transition shrink-0 ${
-              !isSimulating
-                ? 'border-emerald-500/60 bg-emerald-950/40 text-emerald-400'
-                : 'border-amber-500/60 bg-amber-950/40 text-amber-300'
+            onClick={onToggleMute}
+            className={`p-2 rounded-xl border transition cursor-pointer ${
+              isMuted
+                ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                : 'bg-rose-950/40 border-rose-600/30 text-rose-300 hover:bg-rose-900/50'
             }`}
-            title={
-              !isSimulating
-                ? 'Mesa Real Ativa: sem geração de velas fictícias'
-                : 'Modo Treino: gerando rodadas automáticas para teste'
-            }
+            title={isMuted ? 'Ativar Sons do Radar' : 'Silenciar Sons'}
           >
-            <span
-              className={`h-2 w-2 rounded-full ${
-                !isSimulating ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
-              }`}
-            />
-            <span className="hidden sm:inline">
-              {!isSimulating ? 'Mesa Real' : 'Modo Treino'}
-            </span>
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-rose-400" />}
           </button>
 
-          {/* Notifications / Alerts Button */}
+          {/* Notifications toggle */}
           <button
-            id="btn-navbar-notifications"
-            onClick={onOpenNotificationsModal}
-            className="relative flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 p-2 sm:px-2.5 sm:py-1.5 text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition shrink-0"
-            title="Alertas no Telegram, Discord e Push"
-          >
-            <Bell className="h-3.5 w-3.5 text-amber-400" />
-            <span className="hidden lg:inline">Alertas</span>
-            {unreadNotificationsCount > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-pink-500 px-1 text-[9px] font-bold text-white">
-                {unreadNotificationsCount}
-              </span>
-            )}
-          </button>
-
-          {/* Sound Toggle */}
-          <button
-            id="btn-toggle-sound"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`rounded-xl border p-2 text-xs transition shrink-0 ${
-              soundEnabled
-                ? 'border-slate-800 bg-slate-900 text-pink-400 hover:bg-slate-800'
-                : 'border-slate-800 bg-slate-900 text-slate-500 hover:text-slate-400'
+            onClick={onToggleNotifications}
+            className={`p-2 rounded-xl border transition cursor-pointer ${
+              !notificationsEnabled
+                ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                : 'bg-purple-950/40 border-purple-500/30 text-purple-300 hover:bg-purple-900/50'
             }`}
-            title={soundEnabled ? 'Silenciar áudio' : 'Ativar alertas sonoros'}
+            title={notificationsEnabled ? 'Notificações de Rosas Ativadas' : 'Ativar Alertas no Navegador'}
           >
-            {soundEnabled ? (
-              <Volume2 className="h-4 w-4 text-pink-400" />
-            ) : (
-              <VolumeX className="h-4 w-4 text-slate-500" />
-            )}
+            {notificationsEnabled ? <Bell className="w-4 h-4 text-purple-400" /> : <BellOff className="w-4 h-4" />}
           </button>
 
-          {/* PWA Install */}
+          {/* Strategy Guide Modal trigger */}
+          <button
+            onClick={onOpenGuide}
+            className="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition cursor-pointer hidden sm:flex items-center gap-1.5 text-xs font-medium"
+            title="Como funciona o padrão 82b e as minutagens"
+          >
+            <HelpCircle className="w-4 h-4 text-rose-400" />
+            <span className="hidden lg:inline">Estratégias 82b</span>
+          </button>
+
+          {/* PWA Install Button */}
           <PWAInstallButton />
         </div>
       </div>
