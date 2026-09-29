@@ -11,27 +11,30 @@ export interface Candle {
   hash: string;
 }
 
-export type SignalPhase = 'ANALYZING' | 'PREPARING' | 'ACTIVE_ENTRY' | 'WIN' | 'STANDBY';
+export type SignalPhase = 'ANALYZING' | 'PREPARING' | 'ACTIVE_ENTRY' | 'GALE_PROTECTION' | 'WIN' | 'STANDBY';
 
-export type SignalOpportunity = 'ROSA_ALTA' | 'ROXA_COM_EXPANSAO' | 'RECUPERACAO_ROXA';
+export type CandlePrediction = 'ROXA' | 'ROSA';
+
+export type PatternInterval = 3 | 4 | 5;
 
 export interface RadarSignal {
   id: string;
   targetMinute: number; // minute 0-59
+  galeMinute: number; // targetMinute + 1 (minute 0-59)
   targetHour: number; // hour 0-23
-  targetTimeStr: string; // e.g. "16:45"
-  targetTimestamp: number; // Exact millisecond when the minute starts
-  opportunity: SignalOpportunity;
-  primaryTarget: string; // "Saída Segura no 2.00x (Roxa)"
-  secondaryTarget: string; // "Buscar 10.00x+ (Rosa)"
+  targetTimeStr: string; // e.g. "17:37"
+  targetTimestamp: number; // Exact millisecond when the minute starts (:00.000)
+  patternMinutes: PatternInterval; // 3, 4, or 5 minutes pattern
+  candleType: CandlePrediction; // ROXA (2.00x+) or ROSA (10.00x+)
+  targetMultiplier: string; // e.g. "2.00x a 3.50x" or "10.00x+"
   confidence: number; // e.g. 98.4%
-  triggerName: string; // e.g. "Ciclo da Rosa 82b"
-  protectionAdvice: string; // "1ª Mão no 2.00x (garante lucro) | 2ª Mão deixa subir"
-  galeAdvice: string; // "Tolerância: No máximo 1 proteção no minuto seguinte"
+  triggerName: string; // e.g. "Padrão de 5 Minutos (Vela Rosa)"
+  instructions: string; // Clear single execution rule
+  galeAdvice: string; // "Tolerância: Proteção no minuto seguinte"
   phase: SignalPhase;
   secondsRemaining: number;
+  activeSecondsOfMinute: number; // 0 to 59 during the active minute
   resultCandle?: Candle;
-  winType?: 'PURPLE_WIN' | 'PINK_WIN' | 'NORMAL_WIN';
 }
 
 export interface StatsData {

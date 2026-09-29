@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Candle, RadarSignal } from './types/aviator';
+import { Candle, RadarSignal, PatternInterval } from './types/aviator';
 import { 
   generateInitialHistory, 
   calculateNextSignal, 
@@ -27,8 +27,11 @@ export default function App() {
   // Real candles history (calibrated with 82b wall-clock)
   const [candles, setCandles] = useState<Candle[]>(() => generateInitialHistory(25));
   
+  // Selected 82b pattern interval (3, 4, or 5 minutes)
+  const [selectedPattern, setSelectedPattern] = useState<PatternInterval>(3);
+
   // 82b Pattern Radar Signal (Next Candle to enter)
-  const [signal, setSignal] = useState<RadarSignal>(() => calculateNextSignal(candles));
+  const [signal, setSignal] = useState<RadarSignal>(() => calculateNextSignal(candles, 3));
   
   // Audio state
   const [isMuted, setIsMuted] = useState(false);
@@ -60,27 +63,40 @@ export default function App() {
         if (prevPhaseRef.current !== updated.phase) {
           if (updated.phase === 'PREPARING') {
             soundFx.playRadarSweep();
-            // Send background preparation alert
+            const isPinkSig = updated.candleType === 'ROSA';
             backgroundService.sendNotification(
-              `⚠️ PREPARAR ENTRADA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!`,
-              `Horário ${updated.targetTimeStr} na 82b! Mão 1 no 2.00x | Mão 2 na vela alta.`,
+              isPinkSig 
+                ? `🌸 ALERTA: VELA ROSA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!` 
+                : `⚡ ALERTA: VELA ROXA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!`,
+              isPinkSig
+                ? `Entrada às ${updated.targetTimeStr}:00 na 82b! Busque 10.00x+.`
+                : `Entrada às ${updated.targetTimeStr}:00 na 82b! Auto Cashout no 2.00x.`,
               `prep-${updated.targetMinute}`
             );
           } else if (updated.phase === 'ACTIVE_ENTRY') {
             soundFx.playAlertSignal();
-            // Send background entry alert
+            const isPinkSig = updated.candleType === 'ROSA';
             backgroundService.sendNotification(
               `🟢 ENTRAR AGORA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!`,
-              `Rodada autorizada no Aviator 82b! Faça a sua aposta agora.`,
+              isPinkSig
+                ? `Rodada iniciada no Aviator 82b! Alvo: Vela Rosa (10.00x+).`
+                : `Rodada iniciada no Aviator 82b! Alvo: Vela Roxa (2.00x).`,
               `active-${updated.targetMinute}`
+            );
+          } else if (updated.phase === 'GALE_PROTECTION') {
+            soundFx.playRadarSweep();
+            backgroundService.sendNotification(
+              `🛡️ PROTEÇÃO GALE NO MINUTO :${String(updated.galeMinute).padStart(2, '0')}!`,
+              `Rodada esticou para o minuto :${String(updated.galeMinute).padStart(2, '0')}. Mantenha a aposta com auto cashout no 2.00x!`,
+              `gale-${updated.galeMinute}`
             );
           }
           prevPhaseRef.current = updated.phase;
         }
 
-        // When minute has concluded, automatically project next paying window
+        // When minute and gale have concluded, automatically project next paying window
         if (updated.phase === 'STANDBY') {
-          return calculateNextSignal(candles);
+          return calculateNextSignal(candles, selectedPattern);
         }
 
         return updated;
@@ -101,7 +117,7 @@ export default function App() {
       unsubscribeWorker();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [candles]);
+  }, [candles, selectedPattern]);
 
   // 2. User adds/syncs a candle that just appeared on 82b.game
   const handleAddCandleFromUser = useCallback((multiplier: number) => {
@@ -138,8 +154,9 @@ export default function App() {
       return next.slice(-40);
     });
 
-    // Check if user's entered candle matches the current active signal
-    const isTargetMin = now.getMinutes() === signal.targetMinute;
+    // Check if candle matches target minute OR gale protection minute
+    const currentMin = now.getMinutes();
+    const isTargetMin = currentMin === signal.targetMinute || currentMin === signal.galeMinute;
     const isWin = multiplier >= 2.0;
 
     if (isTargetMin && isWin) {
@@ -150,7 +167,7 @@ export default function App() {
       }
 
       backgroundService.sendNotification(
-        `✅ GREEN CONFIRMADO NO MINUTO :${String(signal.targetMinute).padStart(2, '0')}!`,
+        `✅ GREEN CONFIRMADO!`,
         `Vela de ${multiplier.toFixed(2)}x confirmada no Aviator 82b!`,
         `win-${signal.targetMinute}`
       );
@@ -162,20 +179,20 @@ export default function App() {
       }));
 
       setTimeout(() => {
-        setSignal(calculateNextSignal([...candles, newCandle]));
+        setSignal(calculateNextSignal([...candles, newCandle], selectedPattern));
       }, 7000);
     } else {
       // Re-calibrate signal based on the freshly added 82b candle
-      setSignal(calculateNextSignal([...candles, newCandle]));
+      setSignal(calculateNextSignal([...candles, newCandle], selectedPattern));
     }
-  }, [candles, signal]);
+  }, [candles, signal, selectedPattern]);
 
   // 3. User registers Green or Recalculate
   const handleRegisterResult = useCallback((isWin: boolean) => {
     if (isWin) {
       soundFx.playPinkWin();
       backgroundService.sendNotification(
-        `✅ GREEN CONFIRMADO NO MINUTO :${String(signal.targetMinute).padStart(2, '0')}!`,
+        `✅ GREEN CONFIRMADO!`,
         `Vitória registrada com lucro no Aviator 82b!`,
         `win-${signal.targetMinute}`
       );
@@ -184,19 +201,26 @@ export default function App() {
         phase: 'WIN',
       }));
       setTimeout(() => {
-        setSignal(calculateNextSignal(candles));
+        setSignal(calculateNextSignal(candles, selectedPattern));
       }, 7000);
     } else {
       soundFx.playClick();
-      setSignal(calculateNextSignal(candles));
+      setSignal(calculateNextSignal(candles, selectedPattern));
     }
-  }, [candles, signal]);
+  }, [candles, signal, selectedPattern]);
 
-  // 4. Automatic Recalibration
+  // 4. Select pattern (3, 4, or 5 minutes)
+  const handleSelectPattern = useCallback((pattern: PatternInterval) => {
+    setSelectedPattern(pattern);
+    soundFx.playClick();
+    setSignal(calculateNextSignal(candles, pattern));
+  }, [candles]);
+
+  // 5. Automatic Recalibration
   const handleAutoRecalibrate = useCallback(() => {
     soundFx.playRadarSweep();
-    setSignal(calculateNextSignal(candles));
-  }, [candles]);
+    setSignal(calculateNextSignal(candles, selectedPattern));
+  }, [candles, selectedPattern]);
 
   // Toggle Mute
   const handleToggleMute = () => {
@@ -253,6 +277,7 @@ export default function App() {
           signal={signal}
           latestCandle={candles[candles.length - 1] || null}
           currentTimeStr={currentTimeStr}
+          onSelectPattern={handleSelectPattern}
           onAutoRecalibrate={handleAutoRecalibrate}
           onRegisterResult={handleRegisterResult}
         />

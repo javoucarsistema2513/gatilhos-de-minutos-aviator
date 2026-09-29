@@ -1,4 +1,12 @@
-import { Candle, CandleColor, RadarSignal, StatsData, SignalPhase, SignalOpportunity } from '../types/aviator';
+import { 
+  Candle, 
+  CandleColor, 
+  RadarSignal, 
+  StatsData, 
+  SignalPhase, 
+  CandlePrediction,
+  PatternInterval
+} from '../types/aviator';
 
 // Helper to format Date to HH:mm:ss
 export function formatTime(date: Date): string {
@@ -97,94 +105,122 @@ export function generateInitialHistory(count = 25): Candle[] {
 }
 
 /**
- * High-Precision 82b Paying Minute Radar Engine:
- * - Projects the next verified paying window (2 minutes ahead).
- * - Calibrated with DUAL-TARGET (Roxa 2x+ & Rosa 10x+) so the player wins whether it pays Roxa or Rosa!
+ * 82b Pattern Radar Engine:
+ * Strictly follows the 3, 4, and 5 minutes interval patterns!
+ * - Padrão 3 Minutos: Ciclo de Vela Roxa (2x+)
+ * - Padrão 4 Minutos: Ciclo de Vela Roxa Alta
+ * - Padrão 5 Minutos: Ciclo de Vela Rosa (10x+)
+ * Includes 1-minute Gale tolerance (targetMinute + 1) so it never dies at :59!
  */
-export function calculateNextSignal(candles: Candle[]): RadarSignal {
+export function calculateNextSignal(
+  candles: Candle[],
+  selectedPattern?: PatternInterval
+): RadarSignal {
   const now = new Date();
-  
-  // Real 82b timing calibration: 2 minutes ahead from current time
-  const targetDate = new Date(now.getTime() + 2 * 60 * 1000);
-  targetDate.setSeconds(0, 0); // Exact start of that minute :00
+  const latestCandle = candles[candles.length - 1];
+
+  // Base timestamp: use the latest candle timestamp if it occurred recently (< 8 min ago)
+  const isRecentCandle = latestCandle && (now.getTime() - latestCandle.timestamp < 8 * 60 * 1000);
+  const baseTime = isRecentCandle ? new Date(latestCandle.timestamp) : now;
+
+  // Pattern selection: 3, 4, or 5 minutes
+  let patternMinutes: PatternInterval = selectedPattern || 3;
+  if (!selectedPattern) {
+    const lastPink = [...candles].reverse().find(c => c.color === 'pink');
+    const minsSincePink = lastPink ? Math.floor((now.getTime() - lastPink.timestamp) / 60000) : 10;
+    if (minsSincePink >= 8) {
+      patternMinutes = 5; // 5 min pattern for Rosa
+    } else {
+      patternMinutes = 3; // 3 min pattern for Roxa
+    }
+  }
+
+  // Calculate target minute strictly at +patternMinutes from base time (:00.000)
+  let targetDate = new Date(baseTime.getTime() + patternMinutes * 60 * 1000);
+  targetDate.setSeconds(0, 0);
+
+  // If calculated targetDate is already in the past or under 20s away,
+  // project from current minute + patternMinutes
+  if (targetDate.getTime() - now.getTime() < 20000) {
+    targetDate = new Date(now.getTime() + patternMinutes * 60 * 1000);
+    targetDate.setSeconds(0, 0);
+  }
 
   const targetMinute = targetDate.getMinutes();
+  const galeMinute = (targetMinute + 1) % 60;
   const targetHour = targetDate.getHours();
   const targetTimeStr = `${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`;
   const targetTimestamp = targetDate.getTime();
 
-  // 82b Automatic Cycle Detection
-  const lastPink = [...candles].reverse().find(c => c.color === 'pink');
-  const recentCandles = candles.slice(-5);
-  const minutesSincePink = lastPink 
-    ? Math.max(0, Math.floor((now.getTime() - lastPink.timestamp) / (60 * 1000)))
-    : 10;
-
-  const isMirrorMinute = lastPink ? Math.abs(targetMinute - lastPink.minute) % 10 === 0 : false;
-  const isPinkCycleDue = minutesSincePink >= 8 || isMirrorMinute;
-  const hasBluesStreak = recentCandles.length >= 2 && recentCandles[recentCandles.length - 1].color === 'blue';
-
-  let opportunity: SignalOpportunity;
+  let candleType: CandlePrediction;
+  let targetMultiplier: string;
   let triggerName: string;
-  let primaryTarget: string;
-  let secondaryTarget: string;
+  let instructions: string;
   let confidence: number;
 
-  if (isPinkCycleDue) {
-    opportunity = 'ROSA_ALTA';
-    triggerName = `Ciclo da Rosa 82b (${minutesSincePink}m sem Rosa / Minuto Espelho)`;
-    primaryTarget = 'Saída 1: 2.00x no Auto Cashout (Garante Lucro)';
-    secondaryTarget = 'Saída 2: Buscar Vela Rosa (10.00x a 25.00x+)';
+  if (patternMinutes === 5) {
+    candleType = 'ROSA';
+    targetMultiplier = '10.00x+';
+    triggerName = 'Padrão de 5 Minutos (Ciclo da Vela Rosa 82b)';
+    instructions = 'Buscar Vela Rosa: Configurar cashout em 10.00x ou mais';
     confidence = 98.7;
-  } else if (hasBluesStreak) {
-    opportunity = 'RECUPERACAO_ROXA';
-    triggerName = 'Quebra de Padrão Baixo (Virada de Mesa 82b)';
-    primaryTarget = 'Saída 1: 1.80x a 2.00x (Proteção de Banca)';
-    secondaryTarget = 'Saída 2: Vela Roxa Forte (3.00x a 5.00x+)';
+  } else if (patternMinutes === 4) {
+    candleType = 'ROXA';
+    targetMultiplier = '3.00x a 7.00x';
+    triggerName = 'Padrão de 4 Minutos (Vela Roxa Alta com Esticada)';
+    instructions = 'Mão 1 no 2.00x | Mão 2 deixa esticar até 5.00x+';
     confidence = 97.9;
   } else {
-    opportunity = 'ROXA_COM_EXPANSAO';
-    triggerName = 'Frequência de Vela Alta (Roxa com Expansão para Rosa)';
-    primaryTarget = 'Saída 1: 2.00x no Auto Cashout';
-    secondaryTarget = 'Saída 2: Subida Livre até 10.00x+';
-    confidence = 97.4;
+    // 3 minutes
+    candleType = 'ROXA';
+    targetMultiplier = '2.00x a 3.50x';
+    triggerName = 'Padrão de 3 Minutos (Ciclo Rápido de Vela Roxa)';
+    instructions = 'Auto Cashout cravado no 2.00x para proteção da banca';
+    confidence = 98.2;
   }
 
-  const diffSec = Math.floor((targetTimestamp - Date.now()) / 1000);
+  const diffMs = targetTimestamp - Date.now();
+  const secondsRemaining = Math.max(0, Math.ceil(diffMs / 1000));
   let phase: SignalPhase;
 
-  if (diffSec <= 0 && diffSec >= -59) {
+  if (diffMs <= 0 && diffMs >= -60000) {
     phase = 'ACTIVE_ENTRY';
-  } else if (diffSec <= 25) {
+  } else if (diffMs < -60000 && diffMs >= -120000) {
+    phase = 'GALE_PROTECTION';
+  } else if (secondsRemaining <= 25) {
     phase = 'PREPARING';
   } else {
     phase = 'ANALYZING';
   }
 
   return {
-    id: `signal-${targetTimestamp}`,
+    id: `signal-${targetTimestamp}-${patternMinutes}`,
     targetMinute,
+    galeMinute,
     targetHour,
     targetTimeStr,
     targetTimestamp,
-    opportunity,
-    primaryTarget,
-    secondaryTarget,
+    patternMinutes,
+    candleType,
+    targetMultiplier,
     confidence,
     triggerName,
-    protectionAdvice: 'Mão 1 sai no 2.00x (garante lucro) | Mão 2 busca a subida',
-    galeAdvice: 'Tolerância: No máximo 1 proteção no minuto seguinte caso haja oscilação',
+    instructions,
+    galeAdvice: `Tolerância: Proteção no minuto :${String(galeMinute).padStart(2, '0')} caso a rodada atrase`,
     phase,
-    secondsRemaining: Math.max(0, diffSec),
+    secondsRemaining,
+    activeSecondsOfMinute: now.getSeconds(),
   };
 }
 
 /**
- * Re-evaluate signal every second against the real device clock
+ * Re-evaluate signal every second against the real device clock.
+ * Includes GALE_PROTECTION for targetMinute + 1 so predictions don't fail at :59!
  */
 export function updateSignalWithCurrentTime(signal: RadarSignal): RadarSignal {
   const now = Date.now();
-  const diffSec = Math.floor((signal.targetTimestamp - now) / 1000);
+  const diffMs = signal.targetTimestamp - now;
+  const currentWallSeconds = new Date().getSeconds();
 
   let phase: SignalPhase = signal.phase;
 
@@ -192,19 +228,30 @@ export function updateSignalWithCurrentTime(signal: RadarSignal): RadarSignal {
     return signal;
   }
 
-  if (diffSec > 25) {
-    phase = 'ANALYZING'; // Counting down to entry window (> 25s)
-  } else if (diffSec > 0) {
-    phase = 'PREPARING'; // 25s to 1s: Attention, place bet!
-  } else if (diffSec >= -59) {
-    phase = 'ACTIVE_ENTRY'; // Minute is actively happening right now (:00 to :59)
+  // Exact second transitions:
+  // 1. diffMs > 25000: ANALYZING (> 25s before minute)
+  // 2. 0 < diffMs <= 25000: PREPARING (25s countdown to :00)
+  // 3. -60000 <= diffMs <= 0: ACTIVE_ENTRY (target minute is actively running :00 to :59)
+  // 4. -120000 <= diffMs < -60000: GALE_PROTECTION (minute target + 1 is active for Gale protection!)
+  // 5. diffMs < -120000: STANDBY (entry and gale finished, time to roll into next pattern!)
+  if (diffMs > 25000) {
+    phase = 'ANALYZING';
+  } else if (diffMs > 0) {
+    phase = 'PREPARING';
+  } else if (diffMs >= -60000) {
+    phase = 'ACTIVE_ENTRY';
+  } else if (diffMs >= -120000) {
+    phase = 'GALE_PROTECTION';
   } else {
-    phase = 'STANDBY'; // Minute has elapsed, time to roll into next paying minute
+    phase = 'STANDBY';
   }
+
+  const secondsRemaining = Math.max(0, Math.ceil(diffMs / 1000));
 
   return {
     ...signal,
     phase,
-    secondsRemaining: Math.max(0, diffSec),
+    secondsRemaining,
+    activeSecondsOfMinute: currentWallSeconds,
   };
 }
