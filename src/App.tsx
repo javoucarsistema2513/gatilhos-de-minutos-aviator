@@ -280,6 +280,7 @@ export default function App() {
           onSelectPattern={handleSelectPattern}
           onAutoRecalibrate={handleAutoRecalibrate}
           onRegisterResult={handleRegisterResult}
+          onAddCandle={handleAddCandleFromUser}
         />
 
         {/* Background Notifications Card */}

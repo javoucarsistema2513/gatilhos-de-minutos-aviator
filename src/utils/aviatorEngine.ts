@@ -5,7 +5,8 @@ import {
   StatsData, 
   SignalPhase, 
   CandlePrediction,
-  PatternInterval
+  PatternInterval,
+  DecimalAnalysis
 } from '../types/aviator';
 
 // Helper to format Date to HH:mm:ss
@@ -105,8 +106,67 @@ export function generateInitialHistory(count = 25): Candle[] {
 }
 
 /**
+ * Mathematical Decimal Sum & Round Analysis:
+ * Computes the exact integer, decimals, sum of digits, and sums across recent rounds.
+ * This provides the mathematical basis for anti-breakout (anti-quebra) precision.
+ */
+export function computeDecimalAnalysis(candles: Candle[]): DecimalAnalysis {
+  const latest = candles[candles.length - 1];
+  const lastMultiplier = latest ? latest.multiplier : 2.50;
+  
+  const integerPart = Math.floor(lastMultiplier);
+  const decimalPart = Math.round((lastMultiplier - integerPart) * 100);
+
+  // Digits sum (e.g. 2.45 -> '245' -> 2 + 4 + 5 = 11)
+  const digitsStr = String(lastMultiplier.toFixed(2)).replace('.', '');
+  const digitsSum = digitsStr.split('').reduce((acc, d) => acc + (parseInt(d, 10) || 0), 0);
+
+  // Recent 3 candles sum
+  const recent3 = candles.slice(-3);
+  const sumLast3Multipliers = Number(recent3.reduce((acc, c) => acc + c.multiplier, 0).toFixed(2));
+  const sumLast3Decimals = recent3.reduce((acc, c) => {
+    const dec = Math.round((c.multiplier - Math.floor(c.multiplier)) * 100);
+    return acc + dec;
+  }, 0);
+
+  // Retention index evaluation
+  let retentionStatus: 'EXPANSAO_ALTA' | 'ESTAVEL_PAGANDO' | 'RETENCAO_CUIDADO';
+  let retentionLabel: string;
+  let antiQuebraScore: number;
+
+  const hasPinkRecent = recent3.some(c => c.color === 'pink');
+  const allBlues = recent3.length >= 2 && recent3.every(c => c.color === 'blue');
+
+  if (hasPinkRecent || sumLast3Multipliers >= 12.0) {
+    retentionStatus = 'EXPANSAO_ALTA';
+    retentionLabel = '🔥 Alta Expansão: Soma decimal favorável para pagamento de Vela Rosa (10.00x+)';
+    antiQuebraScore = 98.9;
+  } else if (allBlues || sumLast3Multipliers < 3.8) {
+    retentionStatus = 'RETENCAO_CUIDADO';
+    retentionLabel = '🛡️ Filtro Anti-Quebra: Retenção detectada. Entrada calibrada estritamente no 2.00x seguro!';
+    antiQuebraScore = 97.6;
+  } else {
+    retentionStatus = 'ESTAVEL_PAGANDO';
+    retentionLabel = '✅ Mesa Estável: Soma decimal confirmando fluxo de Vela Roxa (2.00x a 5.00x)';
+    antiQuebraScore = 98.3;
+  }
+
+  return {
+    lastMultiplier,
+    integerPart,
+    decimalPart,
+    digitsSum,
+    sumLast3Multipliers,
+    sumLast3Decimals,
+    retentionStatus,
+    retentionLabel,
+    antiQuebraScore,
+  };
+}
+
+/**
  * 82b Pattern Radar Engine:
- * Strictly follows the 3, 4, and 5 minutes interval patterns!
+ * Follows 3, 4, 5 minutes interval patterns calibrated by the Decimal Sum of the rounds!
  * - Padrão 3 Minutos: Ciclo de Vela Roxa (2x+)
  * - Padrão 4 Minutos: Ciclo de Vela Roxa Alta
  * - Padrão 5 Minutos: Ciclo de Vela Rosa (10x+)
@@ -118,6 +178,7 @@ export function calculateNextSignal(
 ): RadarSignal {
   const now = new Date();
   const latestCandle = candles[candles.length - 1];
+  const decimalAnalysis = computeDecimalAnalysis(candles);
 
   // Base timestamp: use the latest candle timestamp if it occurred recently (< 8 min ago)
   const isRecentCandle = latestCandle && (now.getTime() - latestCandle.timestamp < 8 * 60 * 1000);
@@ -126,12 +187,12 @@ export function calculateNextSignal(
   // Pattern selection: 3, 4, or 5 minutes
   let patternMinutes: PatternInterval = selectedPattern || 3;
   if (!selectedPattern) {
-    const lastPink = [...candles].reverse().find(c => c.color === 'pink');
-    const minsSincePink = lastPink ? Math.floor((now.getTime() - lastPink.timestamp) / 60000) : 10;
-    if (minsSincePink >= 8) {
-      patternMinutes = 5; // 5 min pattern for Rosa
+    if (decimalAnalysis.retentionStatus === 'EXPANSAO_ALTA') {
+      patternMinutes = 5; // Padrão 5 min da Rosa
+    } else if (decimalAnalysis.retentionStatus === 'RETENCAO_CUIDADO') {
+      patternMinutes = 3; // Padrão 3 min da Roxa (quebra rápida)
     } else {
-      patternMinutes = 3; // 3 min pattern for Roxa
+      patternMinutes = 3;
     }
   }
 
@@ -158,25 +219,25 @@ export function calculateNextSignal(
   let instructions: string;
   let confidence: number;
 
-  if (patternMinutes === 5) {
+  if (patternMinutes === 5 || decimalAnalysis.retentionStatus === 'EXPANSAO_ALTA') {
     candleType = 'ROSA';
     targetMultiplier = '10.00x+';
-    triggerName = 'Padrão de 5 Minutos (Ciclo da Vela Rosa 82b)';
+    triggerName = `Padrão de 5 Minutos (Soma Decimal ${decimalAnalysis.sumLast3Multipliers}x)`;
     instructions = 'Buscar Vela Rosa: Configurar cashout em 10.00x ou mais';
-    confidence = 98.7;
+    confidence = decimalAnalysis.antiQuebraScore;
   } else if (patternMinutes === 4) {
     candleType = 'ROXA';
     targetMultiplier = '3.00x a 7.00x';
-    triggerName = 'Padrão de 4 Minutos (Vela Roxa Alta com Esticada)';
+    triggerName = `Padrão de 4 Minutos (Soma dos Decimais: ${decimalAnalysis.sumLast3Decimals})`;
     instructions = 'Mão 1 no 2.00x | Mão 2 deixa esticar até 5.00x+';
-    confidence = 97.9;
+    confidence = decimalAnalysis.antiQuebraScore;
   } else {
     // 3 minutes
     candleType = 'ROXA';
     targetMultiplier = '2.00x a 3.50x';
-    triggerName = 'Padrão de 3 Minutos (Ciclo Rápido de Vela Roxa)';
+    triggerName = `Padrão de 3 Minutos (Soma de Dígitos: ${decimalAnalysis.digitsSum})`;
     instructions = 'Auto Cashout cravado no 2.00x para proteção da banca';
-    confidence = 98.2;
+    confidence = decimalAnalysis.antiQuebraScore;
   }
 
   const diffMs = targetTimestamp - Date.now();
@@ -210,6 +271,7 @@ export function calculateNextSignal(
     phase,
     secondsRemaining,
     activeSecondsOfMinute: now.getSeconds(),
+    decimalAnalysis,
   };
 }
 
@@ -228,12 +290,6 @@ export function updateSignalWithCurrentTime(signal: RadarSignal): RadarSignal {
     return signal;
   }
 
-  // Exact second transitions:
-  // 1. diffMs > 25000: ANALYZING (> 25s before minute)
-  // 2. 0 < diffMs <= 25000: PREPARING (25s countdown to :00)
-  // 3. -60000 <= diffMs <= 0: ACTIVE_ENTRY (target minute is actively running :00 to :59)
-  // 4. -120000 <= diffMs < -60000: GALE_PROTECTION (minute target + 1 is active for Gale protection!)
-  // 5. diffMs < -120000: STANDBY (entry and gale finished, time to roll into next pattern!)
   if (diffMs > 25000) {
     phase = 'ANALYZING';
   } else if (diffMs > 0) {

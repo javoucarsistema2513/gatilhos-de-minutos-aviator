@@ -17,6 +17,18 @@ export type CandlePrediction = 'ROXA' | 'ROSA';
 
 export type PatternInterval = 3 | 4 | 5;
 
+export interface DecimalAnalysis {
+  lastMultiplier: number;
+  integerPart: number;
+  decimalPart: number;
+  digitsSum: number; // sum of digits, e.g. 2.45 -> 2 + 4 + 5 = 11
+  sumLast3Multipliers: number; // e.g. 1.34 + 2.18 + 4.82 = 8.34
+  sumLast3Decimals: number; // e.g. 34 + 18 + 82 = 134
+  retentionStatus: 'EXPANSAO_ALTA' | 'ESTAVEL_PAGANDO' | 'RETENCAO_CUIDADO';
+  retentionLabel: string;
+  antiQuebraScore: number; // e.g. 98.8%
+}
+
 export interface RadarSignal {
   id: string;
   targetMinute: number; // minute 0-59
@@ -34,6 +46,7 @@ export interface RadarSignal {
   phase: SignalPhase;
   secondsRemaining: number;
   activeSecondsOfMinute: number; // 0 to 59 during the active minute
+  decimalAnalysis: DecimalAnalysis; // Mathematical round & decimal sum
   resultCandle?: Candle;
 }
 

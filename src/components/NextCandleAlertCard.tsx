@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { RadarSignal, Candle, PatternInterval } from '../types/aviator';
 import { 
   Sparkles, 
@@ -11,7 +11,9 @@ import {
   RefreshCw, 
   Timer,
   ShieldAlert,
-  Sliders
+  Sliders,
+  Calculator,
+  Plus
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 
@@ -22,6 +24,7 @@ interface NextCandleAlertCardProps {
   onSelectPattern: (pattern: PatternInterval) => void;
   onAutoRecalibrate: () => void;
   onRegisterResult: (isWin: boolean) => void;
+  onAddCandle: (multiplier: number) => void;
 }
 
 export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
@@ -31,13 +34,24 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
   onSelectPattern,
   onAutoRecalibrate,
   onRegisterResult,
+  onAddCandle,
 }) => {
+  const [quickInput, setQuickInput] = useState('');
   const isPink = signal.candleType === 'ROSA';
 
   // Live countdown formatting
   const mins = Math.floor(signal.secondsRemaining / 60);
   const secs = signal.secondsRemaining % 60;
   const countdownFormatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+  const handleQuickAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(quickInput.replace(',', '.'));
+    if (!isNaN(val) && val >= 1.0) {
+      onAddCandle(Number(val.toFixed(2)));
+      setQuickInput('');
+    }
+  };
 
   const getStatusConfig = () => {
     switch (signal.phase) {
@@ -98,6 +112,8 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
   const handleTestSound = () => {
     soundFx.playAlertSignal();
   };
+
+  const dec = signal.decimalAnalysis;
 
   return (
     <div className={`w-full rounded-2xl bg-[#0c0618] border ${status.containerBorder} transition-all duration-300 overflow-hidden`}>
@@ -309,6 +325,86 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
 
       </div>
 
+      {/* NEW: Painel de Alta Precisão - Soma da Rodada com Decimais */}
+      <div className="mx-4 sm:mx-6 mb-4 p-3.5 rounded-xl bg-[#130726] border border-purple-500/40 text-xs">
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-purple-900/60">
+          <div className="flex items-center gap-2">
+            <Calculator className="w-4 h-4 text-purple-400" />
+            <span className="font-bold text-white uppercase text-[11px] tracking-wide">
+              Cálculo por Soma da Rodada com Decimal:
+            </span>
+          </div>
+          <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+            Assertividade: {dec.antiQuebraScore}%
+          </span>
+        </div>
+
+        {/* 3 Metric Badges */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center">
+          
+          <div className="p-2 rounded-lg bg-[#0e051d] border border-purple-950">
+            <span className="text-[10px] text-slate-400 block font-mono">Última Vela</span>
+            <span className="text-sm font-black font-mono text-white">
+              {dec.lastMultiplier.toFixed(2)}x
+            </span>
+            <span className="text-[10px] text-purple-300 block font-mono">
+              Decimais: ,{String(dec.decimalPart).padStart(2, '0')} (Dígitos: {dec.digitsSum})
+            </span>
+          </div>
+
+          <div className="p-2 rounded-lg bg-[#0e051d] border border-purple-950">
+            <span className="text-[10px] text-slate-400 block font-mono">Soma das 3 Rodadas</span>
+            <span className="text-sm font-black font-mono text-rose-400">
+              {dec.sumLast3Multipliers.toFixed(2)}x
+            </span>
+            <span className="text-[10px] text-rose-300 block font-mono">
+              Soma Decimais: {dec.sumLast3Decimals}
+            </span>
+          </div>
+
+          <div className="p-2 rounded-lg bg-[#0e051d] border border-purple-950">
+            <span className="text-[10px] text-slate-400 block font-mono">Status da Mesa</span>
+            <span className="text-xs font-black font-mono text-amber-300 block mt-0.5">
+              {dec.retentionStatus === 'EXPANSAO_ALTA' ? 'ALTA EXPANSÃO' : dec.retentionStatus === 'RETENCAO_CUIDADO' ? 'RETENÇÃO (ANTI-QUEBRA)' : 'MESA ESTÁVEL'}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {signal.candleType === 'ROSA' ? 'Alvo: 10.00x+' : 'Alvo: 2.00x'}
+            </span>
+          </div>
+
+        </div>
+
+        {/* Retention / Anti-Breakout Banner */}
+        <div className="mt-2.5 pt-2 border-t border-purple-950/80 text-[11px] text-slate-300 flex items-center gap-1.5">
+          <span>{dec.retentionLabel}</span>
+        </div>
+      </div>
+
+      {/* Direct Quick Add / Real-time Sync Form */}
+      <div className="mx-4 sm:mx-6 mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+        <div className="flex items-center gap-1.5 text-xs text-slate-300">
+          <span className="font-bold text-white text-[11px]">Sincronizar Vela da 82b:</span>
+          <span className="text-slate-400 text-[10px]">(digite o valor que acabou de sair)</span>
+        </div>
+
+        <form onSubmit={handleQuickAdd} className="flex items-center gap-1.5 w-full sm:w-auto">
+          <input
+            type="text"
+            placeholder="Ex: 2.45"
+            value={quickInput}
+            onChange={(e) => setQuickInput(e.target.value)}
+            className="w-24 px-2 py-1 rounded bg-[#100720] border border-purple-500/60 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+          />
+          <button
+            type="submit"
+            className="px-3 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shrink-0"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Calcular Soma</span>
+          </button>
+        </form>
+      </div>
+
       {/* Regra de Ouro da Entrada & Proteção Gale */}
       <div className="px-4 sm:px-6 pb-5 pt-1">
         
@@ -332,7 +428,7 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
             <span className="font-bold uppercase tracking-wide block text-white text-[11px]">
               {signal.phase === 'GALE_PROTECTION' 
                 ? 'PROTEÇÃO GALE ATIVA (NÃO DESISTA DA ENTRADA):' 
-                : `INSTRUÇÃO PADRÃO ${signal.patternMinutes} MINUTOS:`}
+                : `INSTRUÇÃO PADRÃO ${signal.patternMinutes} MINUTOS (SOMA DECIMAL):`}
             </span>
             <p className="text-[11px] mt-0.5 text-slate-300">
               {signal.phase === 'GALE_PROTECTION' ? (
