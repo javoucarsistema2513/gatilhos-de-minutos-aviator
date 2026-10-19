@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Candle, RadarSignal, PatternInterval } from './types/aviator';
+import { Candle, RadarSignal, StudyMethod } from './types/aviator';
 import { 
   generateInitialHistory, 
   calculateNextSignal, 
@@ -27,11 +27,11 @@ export default function App() {
   // Real candles history (calibrated with 82b wall-clock)
   const [candles, setCandles] = useState<Candle[]>(() => generateInitialHistory(25));
   
-  // Selected 82b pattern interval (3, 4, or 5 minutes)
-  const [selectedPattern, setSelectedPattern] = useState<PatternInterval>(3);
+  // Selected study method (defaults to AUTO_BEST)
+  const [selectedMethod, setSelectedMethod] = useState<StudyMethod>('AUTO_BEST');
 
   // 82b Pattern Radar Signal (Next Candle to enter)
-  const [signal, setSignal] = useState<RadarSignal>(() => calculateNextSignal(candles, 3));
+  const [signal, setSignal] = useState<RadarSignal>(() => calculateNextSignal(candles, 'AUTO_BEST'));
   
   // Audio state
   const [isMuted, setIsMuted] = useState(false);
@@ -63,31 +63,29 @@ export default function App() {
         if (prevPhaseRef.current !== updated.phase) {
           if (updated.phase === 'PREPARING') {
             soundFx.playRadarSweep();
-            const isPinkSig = updated.candleType === 'ROSA';
+            const isPinkSig = updated.candleType === 'ROSA' || updated.candleType === 'SUPER_ROSA';
             backgroundService.sendNotification(
               isPinkSig 
-                ? `🌸 ALERTA: VELA ROSA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!` 
-                : `⚡ ALERTA: VELA ROXA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!`,
-              isPinkSig
-                ? `Entrada às ${updated.targetTimeStr}:00 na 82b! Busque 10.00x+.`
-                : `Entrada às ${updated.targetTimeStr}:00 na 82b! Auto Cashout no 2.00x.`,
+                ? `🌸 ALERTA ESTUDOS: VELA ROSA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!` 
+                : `⚡ ALERTA ESTUDOS: VELA ROXA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!`,
+              `Entrada exata às ${updated.targetTimeStr}:${String(updated.targetSeconds).padStart(2, '0')}. Alvo: ${updated.targetMultiplier}.`,
               `prep-${updated.targetMinute}`
             );
           } else if (updated.phase === 'ACTIVE_ENTRY') {
             soundFx.playAlertSignal();
-            const isPinkSig = updated.candleType === 'ROSA';
+            const isPinkSig = updated.candleType === 'ROSA' || updated.candleType === 'SUPER_ROSA';
             backgroundService.sendNotification(
               `🟢 ENTRAR AGORA NO MINUTO :${String(updated.targetMinute).padStart(2, '0')}!`,
               isPinkSig
-                ? `Rodada iniciada no Aviator 82b! Alvo: Vela Rosa (10.00x+).`
-                : `Rodada iniciada no Aviator 82b! Alvo: Vela Roxa (2.00x).`,
+                ? `Rodada iniciada no Aviator 82b! Alvo: ${updated.targetMultiplier}.`
+                : `Rodada iniciada no Aviator 82b! Alvo: Vela Roxa.`,
               `active-${updated.targetMinute}`
             );
           } else if (updated.phase === 'GALE_PROTECTION') {
             soundFx.playRadarSweep();
             backgroundService.sendNotification(
               `🛡️ PROTEÇÃO GALE NO MINUTO :${String(updated.galeMinute).padStart(2, '0')}!`,
-              `Rodada esticou para o minuto :${String(updated.galeMinute).padStart(2, '0')}. Mantenha a aposta com auto cashout no 2.00x!`,
+              `Rodada esticou para o minuto :${String(updated.galeMinute).padStart(2, '0')}. Mantenha a aposta com auto cashout no 1.49x/2.00x!`,
               `gale-${updated.galeMinute}`
             );
           }
@@ -96,7 +94,7 @@ export default function App() {
 
         // When minute and gale have concluded, automatically project next paying window
         if (updated.phase === 'STANDBY') {
-          return calculateNextSignal(candles, selectedPattern);
+          return calculateNextSignal(candles, selectedMethod);
         }
 
         return updated;
@@ -117,7 +115,7 @@ export default function App() {
       unsubscribeWorker();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [candles, selectedPattern]);
+  }, [candles, selectedMethod]);
 
   // 2. User adds/syncs a candle that just appeared on 82b.game
   const handleAddCandleFromUser = useCallback((multiplier: number) => {
@@ -132,6 +130,7 @@ export default function App() {
       timestamp: now.getTime(),
       timeFormatted: formatTime(now),
       minute: now.getMinutes(),
+      seconds: now.getSeconds(),
       color,
       hash: `${roundId}_82b_${Date.now()}`,
     };
@@ -179,13 +178,13 @@ export default function App() {
       }));
 
       setTimeout(() => {
-        setSignal(calculateNextSignal([...candles, newCandle], selectedPattern));
+        setSignal(calculateNextSignal([...candles, newCandle], selectedMethod));
       }, 7000);
     } else {
       // Re-calibrate signal based on the freshly added 82b candle
-      setSignal(calculateNextSignal([...candles, newCandle], selectedPattern));
+      setSignal(calculateNextSignal([...candles, newCandle], selectedMethod));
     }
-  }, [candles, signal, selectedPattern]);
+  }, [candles, signal, selectedMethod]);
 
   // 3. User registers Green or Recalculate
   const handleRegisterResult = useCallback((isWin: boolean) => {
@@ -201,26 +200,26 @@ export default function App() {
         phase: 'WIN',
       }));
       setTimeout(() => {
-        setSignal(calculateNextSignal(candles, selectedPattern));
+        setSignal(calculateNextSignal(candles, selectedMethod));
       }, 7000);
     } else {
       soundFx.playClick();
-      setSignal(calculateNextSignal(candles, selectedPattern));
+      setSignal(calculateNextSignal(candles, selectedMethod));
     }
-  }, [candles, signal, selectedPattern]);
+  }, [candles, signal, selectedMethod]);
 
-  // 4. Select pattern (3, 4, or 5 minutes)
-  const handleSelectPattern = useCallback((pattern: PatternInterval) => {
-    setSelectedPattern(pattern);
+  // 4. Select study method
+  const handleSelectMethod = useCallback((method: StudyMethod) => {
+    setSelectedMethod(method);
     soundFx.playClick();
-    setSignal(calculateNextSignal(candles, pattern));
+    setSignal(calculateNextSignal(candles, method));
   }, [candles]);
 
   // 5. Automatic Recalibration
   const handleAutoRecalibrate = useCallback(() => {
     soundFx.playRadarSweep();
-    setSignal(calculateNextSignal(candles, selectedPattern));
-  }, [candles, selectedPattern]);
+    setSignal(calculateNextSignal(candles, selectedMethod));
+  }, [candles, selectedMethod]);
 
   // Toggle Mute
   const handleToggleMute = () => {
@@ -277,10 +276,12 @@ export default function App() {
           signal={signal}
           latestCandle={candles[candles.length - 1] || null}
           currentTimeStr={currentTimeStr}
-          onSelectPattern={handleSelectPattern}
+          selectedMethod={selectedMethod}
+          onSelectMethod={handleSelectMethod}
           onAutoRecalibrate={handleAutoRecalibrate}
           onRegisterResult={handleRegisterResult}
           onAddCandle={handleAddCandleFromUser}
+          onOpenGuide={() => setIsGuideOpen(true)}
         />
 
         {/* Background Notifications Card */}
@@ -296,7 +297,7 @@ export default function App() {
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3 text-[11px]">
           <div className="flex items-center gap-1.5">
             <Plane className="w-3.5 h-3.5 text-rose-500 -rotate-45" />
-            <span className="font-bold text-slate-300">Radar Aviator 82b.game</span>
+            <span className="font-bold text-slate-300">Radar Aviator 82b.game — Estudos Módulos I a V</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -305,7 +306,7 @@ export default function App() {
               onClick={() => setIsGuideOpen(true)}
               className="text-slate-400 hover:text-white underline cursor-pointer"
             >
-              Ajuda / Dicas
+              Apostilas dos Estudos
             </button>
           </div>
         </div>

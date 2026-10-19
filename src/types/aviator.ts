@@ -7,15 +7,57 @@ export interface Candle {
   timestamp: number; // millisecond timestamp
   timeFormatted: string; // HH:mm:ss
   minute: number; // 0-59
+  seconds: number; // 0-59
   color: CandleColor;
   hash: string;
 }
 
 export type SignalPhase = 'ANALYZING' | 'PREPARING' | 'ACTIVE_ENTRY' | 'GALE_PROTECTION' | 'WIN' | 'STANDBY';
 
-export type CandlePrediction = 'ROXA' | 'ROSA';
+export type CandlePrediction = 'ROXA' | 'ROSA' | 'SUPER_ROSA';
 
-export type PatternInterval = 3 | 4 | 5;
+export type StudyMethod = 
+  | 'AUTO_BEST'
+  | 'SUBTRACAO_DECIMAIS'   // Módulo 5 pág 3 & Módulo 3 pág 7 (ex: 37.89 -> 7-3=4, 9-8=1 -> 4+1=5min)
+  | 'DIGITO_APOS_PONTO'    // Módulo 5 pág 4 & pág 33 (ex: 10.79x -> +7min, 7.39x -> +3min)
+  | 'MINUTO_MAIS_DECIMAL'  // Módulo 4 pág 44-47 (ex: 09:59 + ,08 = 10:07)
+  | 'DIGITO_RODADA'        // Módulo 5 pág 1 & Módulo 2 pág 5 (Hora + dígito final do ID)
+  | 'VELAS_ESPECIAIS'      // Módulo 4 pág 9, 26, 27 (1.00x, 1.37x, 1.11x, 1.88x, 1.99x)
+  | 'CICLO_MINUTOS';       // +3m (2x), +10m (5x), +20m (10x), +30m (50x/100x)
+
+export interface TriggerCheck {
+  isTrigger: boolean;
+  triggerType: 'SPECIAL_100' | 'SPECIAL_137' | 'SPECIAL_188' | 'SPECIAL_111' | 'SPECIAL_199' | 'TRIGGER_5X' | 'TRIGGER_10X' | 'RESET_100' | 'PAIR_TRIGGER' | 'NONE';
+  title: string;
+  expectedTarget: string; // "5x ou mais", "10x ou mais", "2x"
+  recommendedEntries: number; // usually 5 entries
+  protectionCashout: string; // "1.49x" or "2.00x"
+}
+
+export interface FinalCheck {
+  finalDigit: number; // last digit of multiplier, e.g. 7 in 2.37
+  type: 'RED_ALERT_7' | 'GREEN_2X_1' | 'PURPLE_2X_5' | 'NEUTRAL';
+  description: string;
+}
+
+export interface StudyCalculation {
+  methodUsed: StudyMethod;
+  methodName: string;
+  formulaDisplay: string; // e.g. "37,89x: (7-3=4) + (9-8=1) = +5 min => 17:07:55"
+  baseTimeFormatted: string; // HH:mm:ss
+  targetTimeFormatted: string; // HH:mm:ss
+  targetSecondsOffset: number; // exact second: 00 to 59
+  multiplierTarget: string; // "2.00x a 3.50x", "5.00x+", "10.00x+"
+  suggestedEntries: number; // 2 to 5 entries
+  protectionCashout: '1.49x' | '2.00x';
+  triggerInfo?: TriggerCheck;
+  finalDigitInfo?: FinalCheck;
+  rule13Active?: {
+    highCandleMultiplier: number;
+    remainingHouses: number;
+    isOddHouse: boolean;
+  };
+}
 
 export interface DecimalAnalysis {
   lastMultiplier: number;
@@ -26,27 +68,30 @@ export interface DecimalAnalysis {
   sumLast3Decimals: number; // e.g. 34 + 18 + 82 = 134
   retentionStatus: 'EXPANSAO_ALTA' | 'ESTAVEL_PAGANDO' | 'RETENCAO_CUIDADO';
   retentionLabel: string;
-  antiQuebraScore: number; // e.g. 98.8%
+  antiQuebraScore: number;
 }
 
 export interface RadarSignal {
   id: string;
   targetMinute: number; // minute 0-59
-  galeMinute: number; // targetMinute + 1 (minute 0-59)
+  galeMinute: number; // targetMinute + 1
   targetHour: number; // hour 0-23
   targetTimeStr: string; // e.g. "17:37"
-  targetTimestamp: number; // Exact millisecond when the minute starts (:00.000)
-  patternMinutes: PatternInterval; // 3, 4, or 5 minutes pattern
-  candleType: CandlePrediction; // ROXA (2.00x+) or ROSA (10.00x+)
-  targetMultiplier: string; // e.g. "2.00x a 3.50x" or "10.00x+"
-  confidence: number; // e.g. 98.4%
-  triggerName: string; // e.g. "Padrão de 5 Minutos (Vela Rosa)"
-  instructions: string; // Clear single execution rule
-  galeAdvice: string; // "Tolerância: Proteção no minuto seguinte"
+  targetSeconds: number; // exact calculated second of entry (0-59)
+  targetTimestamp: number; // Exact millisecond when the window starts
+  patternMinutes?: number;
+  candleType: CandlePrediction; // ROXA, ROSA or SUPER_ROSA
+  targetMultiplier: string;
+  confidence: number;
+  triggerName: string;
+  instructions: string;
+  protectionAdvice: string;
+  galeAdvice: string;
   phase: SignalPhase;
   secondsRemaining: number;
-  activeSecondsOfMinute: number; // 0 to 59 during the active minute
-  decimalAnalysis: DecimalAnalysis; // Mathematical round & decimal sum
+  activeSecondsOfMinute: number;
+  decimalAnalysis: DecimalAnalysis;
+  studyCalculation: StudyCalculation;
   resultCandle?: Candle;
 }
 
