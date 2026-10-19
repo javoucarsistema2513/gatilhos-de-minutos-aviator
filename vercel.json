@@ -1,0 +1,26 @@
+{
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/ai/analyze-chart",
+      "destination": "/api/ai/analyze-chart"
+    },
+    {
+      "source": "/api/ai/chat-assistant",
+      "destination": "/api/ai/chat-assistant"
+    },
+    {
+      "source": "/api/ai/forecast-analysis",
+      "destination": "/api/ai/forecast-analysis"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

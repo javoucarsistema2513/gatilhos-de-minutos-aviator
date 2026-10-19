@@ -18,10 +18,14 @@ import { Navbar } from './components/Navbar';
 import { CandleTape } from './components/CandleTape';
 import { NextCandleAlertCard } from './components/NextCandleAlertCard';
 import { BackgroundStatusCard } from './components/BackgroundStatusCard';
+import { AIAssistantPanel } from './components/AIAssistantPanel';
+import { AIChartScannerModal } from './components/AIChartScannerModal';
+import { FutureCandlesRadar } from './components/FutureCandlesRadar';
 import { CandleDetailsModal } from './components/CandleDetailsModal';
 import { StrategyGuideModal } from './components/StrategyGuideModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { Plane } from 'lucide-react';
+import { AIChartAnalysis, FuturePinkSignal, CandleRoundDetail } from './types/aviator';
+import { Plane, Activity, Sparkles } from 'lucide-react';
 
 export default function App() {
   // Real candles history (calibrated with 82b wall-clock)
@@ -47,6 +51,10 @@ export default function App() {
   // Modals
   const [selectedCandle, setSelectedCandle] = useState<Candle | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isImageScannerOpen, setIsImageScannerOpen] = useState(false);
+
+  // Active Main View (Live radar vs 7h/12h/24h Future Predictions)
+  const [activeView, setActiveView] = useState<'LIVE' | 'FUTURE_FORECAST'>('LIVE');
 
   // Current formatted time (HH:mm:ss)
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(() => formatTime(new Date()));
@@ -231,6 +239,83 @@ export default function App() {
     setSignal(calculateNextSignal(candles, selectedMethod, calibrationOffset));
   }, [candles, selectedMethod, calibrationOffset]);
 
+  // 7. Handle Candles Imported from Gemini Multimodal Chart Analysis (with round details and decimals)
+  const handleImportCandlesFromAI = useCallback((multipliers: number[], roundDetails?: CandleRoundDetail[]) => {
+    if (!multipliers || multipliers.length === 0) return;
+    const now = Date.now();
+    const newCandles: Candle[] = multipliers.map((mult, idx) => {
+      const candleTime = new Date(now - (multipliers.length - 1 - idx) * 35000);
+      const color = getCandleColor(mult);
+      const detail = roundDetails && roundDetails[idx];
+      let roundId = Math.floor(812600 + candles.length + idx + 1);
+      if (detail?.roundNumber) {
+        const parsed = parseInt(detail.roundNumber.replace(/\D/g, ''), 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          roundId = parsed;
+        }
+      }
+      return {
+        id: `ai-candle-${roundId}-${idx}`,
+        roundId,
+        multiplier: mult,
+        timestamp: candleTime.getTime(),
+        timeFormatted: formatTime(candleTime),
+        minute: candleTime.getMinutes(),
+        seconds: candleTime.getSeconds(),
+        color,
+        hash: `${roundId}_82b_ai_${idx}`,
+      };
+    });
+
+    soundFx.playPurpleWin();
+    setCandles((prev) => {
+      const merged = [...prev, ...newCandles];
+      return merged.slice(-40);
+    });
+
+    setTimeout(() => {
+      setSignal(calculateNextSignal([...candles, ...newCandles], selectedMethod, calibrationOffset));
+    }, 100);
+  }, [candles, selectedMethod, calibrationOffset]);
+
+  // 8. Handle Direct AI Prediction Applied from Image Scanner (incorporating decimal analysis)
+  const handleApplyAIPrediction = useCallback((analysis: AIChartAnalysis) => {
+    soundFx.playAlertSignal();
+    const decimalExtra = analysis.decimalFormula 
+      ? ` • Subtração: ${analysis.decimalFormula.subtractionMath}` 
+      : '';
+    setSignal((prev) => ({
+      ...prev,
+      candleType: analysis.targetCandle,
+      targetMultiplier: analysis.targetMultiplier,
+      confidence: analysis.confidence,
+      triggerName: `IA Gemini: ${analysis.dominantPattern}${decimalExtra}`,
+      instructions: `${analysis.entryStrategy}${analysis.decimalFormula ? ` [Entrada: ${analysis.decimalFormula.projectedMinute}]` : ''}`,
+      protectionAdvice: analysis.protectionAdvice,
+    }));
+  }, []);
+
+  // 9. Handle Selection of a Future Pink Signal to load directly into the Active Radar
+  const handleSelectFutureSignalForEntry = useCallback((futureSig: FuturePinkSignal) => {
+    soundFx.playAlertSignal();
+    setSignal((prev) => ({
+      ...prev,
+      candleType: futureSig.category === 'SUPER_ROSA_100X' ? 'SUPER_ROSA' : 'ROSA',
+      targetMultiplier: futureSig.targetMultiplierLabel,
+      targetHour: futureSig.targetHour,
+      targetMinute: futureSig.targetMinute,
+      targetSeconds: futureSig.targetSeconds,
+      targetTimeStr: `${String(futureSig.targetHour).padStart(2, '0')}:${String(futureSig.targetMinute).padStart(2, '0')}`,
+      targetTimestamp: futureSig.targetTimestamp,
+      triggerName: `Futura 100x+: ${futureSig.patternRule}`,
+      instructions: `Entrada Programada 82b: ${futureSig.recommendedEntryMinute}`,
+      protectionAdvice: futureSig.protectionStrategy,
+      confidence: futureSig.confidence,
+      phase: 'PREPARING',
+    }));
+    setActiveView('LIVE');
+  }, []);
+
   // Toggle Mute
   const handleToggleMute = () => {
     const next = !isMuted;
@@ -264,10 +349,13 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar
         onOpenGuide={() => setIsGuideOpen(true)}
+        onOpenImageScanner={() => setIsImageScannerOpen(true)}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
         notificationsEnabled={notificationsEnabled}
         onToggleNotifications={handleToggleNotifications}
+        activeView={activeView}
+        onToggleView={setActiveView}
       />
 
       {/* Top 82b Candle Sync Ribbon with Quick Match Buttons */}
@@ -278,29 +366,80 @@ export default function App() {
         onClearAndSync={handleAutoRecalibrate}
       />
 
-      {/* Main Single-Focused Centerpiece */}
-      <main className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-4 py-5 flex flex-col justify-center space-y-4">
-        
-        {/* THE HERO: Next Candle Alert Card with Live Typing Preview & 82b Calibration */}
-        <NextCandleAlertCard
-          signal={signal}
-          latestCandle={candles[candles.length - 1] || null}
-          currentTimeStr={currentTimeStr}
-          selectedMethod={selectedMethod}
-          calibrationOffset={calibrationOffset}
-          onSelectMethod={handleSelectMethod}
-          onSelectCalibrationOffset={handleSelectCalibrationOffset}
-          onAutoRecalibrate={handleAutoRecalibrate}
-          onRegisterResult={handleRegisterResult}
-          onAddCandle={handleAddCandleFromUser}
-          onOpenGuide={() => setIsGuideOpen(true)}
-        />
+      {/* View Switcher Sub-nav Bar (Mobile & Desktop) */}
+      <div className={`w-full mx-auto px-3 sm:px-4 pt-3 transition-all duration-300 ${activeView === 'FUTURE_FORECAST' ? 'max-w-6xl' : 'max-w-2xl'}`}>
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+          <button
+            onClick={() => setActiveView('LIVE')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeView === 'LIVE'
+                ? 'bg-rose-600 text-white shadow-lg shadow-rose-950/60'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-rose-300" />
+            <span>Radar Ao Vivo (Minuto a Minuto)</span>
+          </button>
 
-        {/* Background Notifications Card */}
-        <BackgroundStatusCard
-          notificationsEnabled={notificationsEnabled}
-          onToggleNotifications={handleToggleNotifications}
-        />
+          <button
+            onClick={() => setActiveView('FUTURE_FORECAST')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeView === 'FUTURE_FORECAST'
+                ? 'bg-gradient-to-r from-amber-500 via-rose-500 to-pink-600 text-white shadow-lg shadow-pink-950/60'
+                : 'text-amber-400/90 hover:text-amber-300 hover:bg-slate-800/50'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+            <span>Velas Futuras 7h • 12h • 24h</span>
+            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] bg-amber-400/20 text-amber-200 border border-amber-400/30 uppercase font-black">
+              100x+
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Single-Focused Centerpiece */}
+      <main className={`flex-1 ${activeView === 'FUTURE_FORECAST' ? 'max-w-6xl' : 'max-w-2xl'} w-full mx-auto px-3 sm:px-4 py-4 flex flex-col justify-center space-y-4 transition-all duration-300`}>
+        
+        {activeView === 'LIVE' ? (
+          <>
+            {/* THE HERO: Next Candle Alert Card with Live Typing Preview & 82b Calibration */}
+            <NextCandleAlertCard
+              signal={signal}
+              latestCandle={candles[candles.length - 1] || null}
+              currentTimeStr={currentTimeStr}
+              selectedMethod={selectedMethod}
+              calibrationOffset={calibrationOffset}
+              onSelectMethod={handleSelectMethod}
+              onSelectCalibrationOffset={handleSelectCalibrationOffset}
+              onAutoRecalibrate={handleAutoRecalibrate}
+              onRegisterResult={handleRegisterResult}
+              onAddCandle={handleAddCandleFromUser}
+              onOpenGuide={() => setIsGuideOpen(true)}
+              onOpenImageScanner={() => setIsImageScannerOpen(true)}
+            />
+
+            {/* AI Assistant Panel: Real-time Round Analysis & Strategy Chat */}
+            <AIAssistantPanel
+              candles={candles}
+              currentSignal={signal}
+              onOpenImageScanner={() => setIsImageScannerOpen(true)}
+              onApplyAIPrediction={handleApplyAIPrediction}
+            />
+
+            {/* Background Notifications Card */}
+            <BackgroundStatusCard
+              notificationsEnabled={notificationsEnabled}
+              onToggleNotifications={handleToggleNotifications}
+            />
+          </>
+        ) : (
+          /* Future Pink Predictions (7h, 12h, 24h) */
+          <FutureCandlesRadar
+            candles={candles}
+            onSelectSignalForEntry={handleSelectFutureSignalForEntry}
+          />
+        )}
 
       </main>
 
@@ -333,6 +472,14 @@ export default function App() {
       <StrategyGuideModal
         isOpen={isGuideOpen}
         onClose={() => setIsGuideOpen(false)}
+      />
+
+      {/* AI Chart Scanner / Multimodal Vision Modal */}
+      <AIChartScannerModal
+        isOpen={isImageScannerOpen}
+        onClose={() => setIsImageScannerOpen(false)}
+        onImportCandles={handleImportCandlesFromAI}
+        onApplyAIPrediction={handleApplyAIPrediction}
       />
 
       {/* PWA Offline Indicator */}

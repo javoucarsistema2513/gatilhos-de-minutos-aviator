@@ -18,7 +18,9 @@ import {
   TrendingUp,
   Award,
   ArrowRight,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Camera,
+  Bot
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 import { calculateLivePreview } from '../utils/aviatorEngine';
@@ -35,6 +37,7 @@ interface NextCandleAlertCardProps {
   onRegisterResult: (isWin: boolean) => void;
   onAddCandle: (multiplier: number) => void;
   onOpenGuide: () => void;
+  onOpenImageScanner: () => void;
 }
 
 export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
@@ -49,6 +52,7 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
   onRegisterResult,
   onAddCandle,
   onOpenGuide,
+  onOpenImageScanner,
 }) => {
   const [quickInput, setQuickInput] = useState('');
   const isSuperPink = signal.candleType === 'SUPER_ROSA';
@@ -200,15 +204,24 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
           </div>
         </div>
 
-        {/* Sync & Audio Controls */}
+        {/* Sync, AI Image & Audio Controls */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenImageScanner}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-950/90 to-purple-950/90 hover:from-rose-900 hover:to-purple-900 border border-rose-500/70 text-xs font-bold text-pink-300 hover:text-white transition cursor-pointer shadow-md shadow-rose-950/40"
+            title="Enviar Print do Gráfico Real (82b) para a IA Analisar"
+          >
+            <Camera className="w-3.5 h-3.5 text-pink-400 animate-pulse" />
+            <span>Print IA</span>
+          </button>
+
           <button
             onClick={onAutoRecalibrate}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-rose-300 hover:text-white transition cursor-pointer"
             title="Recalcular com base na mesa da 82b"
           >
             <RefreshCw className="w-3.5 h-3.5 text-rose-400" />
-            <span>Sincronizar</span>
+            <span className="hidden sm:inline">Sincronizar</span>
           </button>
 
           <button
@@ -616,7 +629,16 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-md shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span>Sincronizar e Confirmar</span>
+            <span>Sincronizar</span>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenImageScanner}
+            className="px-3 py-2 rounded-xl bg-gradient-to-r from-purple-900 to-rose-900 hover:from-purple-800 hover:to-rose-800 border border-purple-500/70 text-pink-300 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow shrink-0"
+            title="Enviar foto ou print do gráfico real para a IA ler as velas"
+          >
+            <Camera className="w-4 h-4 text-pink-400" />
+            <span className="hidden sm:inline">Enviar Print IA</span>
           </button>
         </form>
 

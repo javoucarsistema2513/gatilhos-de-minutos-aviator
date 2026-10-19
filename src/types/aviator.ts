@@ -121,3 +121,97 @@ export interface LiveCandlePreview {
   triggerTitle?: string;
   protectionAdvice: string;
 }
+
+export interface CandleRoundDetail {
+  roundNumber?: string;
+  multiplier: number;
+  fullText: string;
+  integerPart: number;
+  decimalPart: number;
+  finalDigit: number;
+  finalDigitAnalysis: string;
+  parity?: 'PAR' | 'ÍMPAR';
+  color: 'AZUL' | 'ROXA' | 'ROSA';
+}
+
+export interface DecimalFormulaAnalysis {
+  sourceCandle: number;
+  integerPart: number;
+  decimalPart: number;
+  subtractionMath: string;
+  projectedMinute: string;
+  explanation: string;
+}
+
+export interface RoundVerificationData {
+  latestRoundId?: string;
+  totalRoundsDetected: number;
+  roundParity?: 'PAR' | 'ÍMPAR' | 'MISTO';
+  imparAdvantageRule: string;
+  decimalsValidated: boolean;
+  auditVerdict: string;
+}
+
+export interface AIChartAnalysis {
+  extractedCandles: number[];
+  tableState: string;
+  dominantPattern: string;
+  targetCandle: 'ROXA' | 'ROSA' | 'SUPER_ROSA';
+  targetMultiplier: string;
+  projectedTime: string;
+  confidence: number;
+  keyFindings: string[];
+  entryStrategy: string;
+  protectionAdvice: string;
+  warningAlert?: string;
+  roundDetails?: CandleRoundDetail[];
+  decimalFormula?: DecimalFormulaAnalysis;
+  roundVerification?: RoundVerificationData;
+}
+
+export type ForecastHorizon = '7H' | '12H' | '24H' | 'ALL';
+export type FuturePinkCategory = 'SUPER_ROSA_100X' | 'ULTRA_ROSA_500X' | 'ROSA_ESPECIAL';
+
+export interface FuturePinkSignal {
+  id: string;
+  targetTimestamp: number;
+  targetTimeFormatted: string; // HH:mm:ss
+  targetHour: number;
+  targetMinute: number;
+  targetSeconds: number;
+  horizon: '7H' | '12H' | '24H';
+  category: FuturePinkCategory;
+  categoryLabel: string;
+  targetMultiplierLabel: string;
+  minMultiplier: number;
+  maxMultiplier?: number;
+  confidence: number;
+  patternRule: string;
+  patternDetails: string;
+  recommendedEntryMinute: string;
+  protectionStrategy: string;
+  alarmActive: boolean;
+  status: 'AGUARDANDO' | 'JANELA_PROXIMA' | 'EM_ANDAMENTO' | 'FINALIZADO';
+  timeRemainingStr?: string;
+  minutesRemaining: number;
+}
+
+export interface FutureForecastSummary {
+  totalPredicted: number;
+  superRosas100x: number;
+  ultraRosas500x: number;
+  rosasEspeciais: number;
+  nextUpcoming?: FuturePinkSignal;
+  highProbabilityHours: string[];
+}
+
+export interface AIForecastAudit {
+  goldenHours: {
+    timeRange: string;
+    expectedTarget: string;
+    assertividade: number;
+    motivo: string;
+  }[];
+  generalAdvice: string;
+  riskWarning: string;
+}

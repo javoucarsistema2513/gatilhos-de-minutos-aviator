@@ -1,22 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, VolumeX, Bell, BellOff, HelpCircle, Activity } from 'lucide-react';
+import { Volume2, VolumeX, Bell, BellOff, HelpCircle, Activity, Sparkles } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   onOpenGuide: () => void;
+  onOpenImageScanner: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
+  activeView?: 'LIVE' | 'FUTURE_FORECAST';
+  onToggleView?: (view: 'LIVE' | 'FUTURE_FORECAST') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenGuide,
+  onOpenImageScanner,
   isMuted,
   onToggleMute,
   notificationsEnabled,
   onToggleNotifications,
+  activeView = 'LIVE',
+  onToggleView,
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
 
@@ -70,8 +76,36 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
+        {/* Center: View Switcher (Live vs Future Forecast) */}
+        {onToggleView && (
+          <div className="flex items-center gap-1 bg-[#120824] p-1 rounded-xl border border-rose-950/80">
+            <button
+              onClick={() => onToggleView('LIVE')}
+              className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                activeView === 'LIVE'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-950/60'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 text-rose-300" />
+              <span>Ao Vivo</span>
+            </button>
+            <button
+              onClick={() => onToggleView('FUTURE_FORECAST')}
+              className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                activeView === 'FUTURE_FORECAST'
+                  ? 'bg-gradient-to-r from-amber-500 to-pink-600 text-white shadow-md shadow-pink-950/60'
+                  : 'text-amber-400/80 hover:text-amber-300'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>Futuras 100x+ <span className="hidden xl:inline">(7h/12h/24h)</span></span>
+            </button>
+          </div>
+        )}
+
         {/* Center: Live Clock & Sync indicator */}
-        <div className="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-[#140b29] border border-rose-950/80">
+        <div className="hidden lg:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-[#140b29] border border-rose-950/80">
           <div className="flex flex-col text-right">
             <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Hora Oficial (Sync)</span>
             <span className="text-sm font-black font-mono text-white tracking-widest">{currentTime || '--:--:--'}</span>
@@ -119,6 +153,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <HelpCircle className="w-4 h-4 text-rose-400" />
             <span className="hidden lg:inline">Estratégias 82b</span>
+          </button>
+
+          {/* AI Vision Scanner Trigger */}
+          <button
+            onClick={onOpenImageScanner}
+            className="p-2 sm:px-3 sm:py-2 rounded-xl bg-gradient-to-r from-purple-900/60 to-rose-900/60 hover:from-purple-800/80 hover:to-rose-800/80 border border-purple-500/50 text-pink-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-md shadow-purple-950/40"
+            title="Enviar Print do Gráfico Real (82b) para a IA Analisar"
+          >
+            <Sparkles className="w-4 h-4 text-pink-400 animate-pulse" />
+            <span className="hidden md:inline">Leitor IA (Print)</span>
           </button>
 
           {/* PWA Install Button */}
