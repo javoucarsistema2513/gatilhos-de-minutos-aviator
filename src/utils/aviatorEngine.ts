@@ -345,7 +345,8 @@ export function computeDecimalAnalysis(candles: Candle[]): DecimalAnalysis {
  */
 export function calculateStudyMethod(
   candles: Candle[], 
-  requestedMethod: StudyMethod = 'AUTO_BEST'
+  requestedMethod: StudyMethod = 'AUTO_BEST',
+  calibrationOffsetMinutes: number = -2
 ): StudyCalculation {
   const now = new Date();
   const latest = candles[candles.length - 1];
@@ -516,13 +517,15 @@ export function calculateStudyMethod(
     }
   }
 
-  // Calculate target date
-  let targetDate = new Date(baseCandleTime.getTime() + minutesToAdd * 60 * 1000);
+  // Apply 82b timing calibration (removes the 2-minute overshoot):
+  // User noted: "está dando com 2 minutos a mais... tipo fala que vai sair às 23:02 aí sai às 23:00 ou 22:59"
+  const effectiveMinutesToAdd = Math.max(1, minutesToAdd + calibrationOffsetMinutes);
+  let targetDate = new Date(baseCandleTime.getTime() + effectiveMinutesToAdd * 60 * 1000);
   targetDate.setSeconds(targetSecondsOffset, 0);
 
-  // If already past or under 20s away, shift forward by minutesToAdd from current time
-  if (targetDate.getTime() - now.getTime() < 20000) {
-    targetDate = new Date(now.getTime() + Math.max(2, minutesToAdd % 6) * 60 * 1000);
+  // If already past or under 10s away, align to the immediate next minute window
+  if (targetDate.getTime() - now.getTime() < 10000) {
+    targetDate = new Date(now.getTime() + 1 * 60 * 1000);
     targetDate.setSeconds(targetSecondsOffset, 0);
   }
 
@@ -556,11 +559,12 @@ export function calculateStudyMethod(
  */
 export function calculateNextSignal(
   candles: Candle[],
-  requestedMethod: StudyMethod = 'AUTO_BEST'
+  requestedMethod: StudyMethod = 'AUTO_BEST',
+  calibrationOffsetMinutes: number = -2
 ): RadarSignal {
   const now = new Date();
   const decimalAnalysis = computeDecimalAnalysis(candles);
-  const studyCalculation = calculateStudyMethod(candles, requestedMethod);
+  const studyCalculation = calculateStudyMethod(candles, requestedMethod, calibrationOffsetMinutes);
 
   // Parse target date from studyCalculation
   const [targetH, targetM] = studyCalculation.targetTimeFormatted.split(':').map(Number);
@@ -668,5 +672,74 @@ export function updateSignalWithCurrentTime(signal: RadarSignal): RadarSignal {
     phase,
     secondsRemaining,
     activeSecondsOfMinute: currentWallSeconds,
+  };
+}
+
+/**
+ * Instant Live Preview for typed candle in "Sincronizar Vela da 82b":
+ * Immediately shows what target candle will come out and the exact time of entry.
+ */
+export function calculateLivePreview(
+  multiplier: number,
+  baseTime: Date = new Date(),
+  calibrationOffsetMinutes: number = -2
+) {
+  const trigger = checkTriggerCandle(multiplier);
+  const finalDig = checkFinalDigit(multiplier);
+
+  let targetCandle: CandlePrediction = 'ROXA';
+  let targetMultiplier = '2.00x a 3.50x';
+  let minutesToAdd = 2; // Real 82b cycle is 2 minutes (Module 5 pág 2)
+  let formulaDisplay = '';
+
+  if (multiplier >= 100.0) {
+    targetCandle = 'SUPER_ROSA';
+    targetMultiplier = '50.00x a 100.00x+';
+    minutesToAdd = Math.max(1, 4 + calibrationOffsetMinutes);
+    formulaDisplay = `Vela ${multiplier.toFixed(2)}x: Ciclo de Vela Alta (50x/100x+)`;
+  } else if (multiplier >= 10.0 || trigger.triggerType === 'TRIGGER_10X' || trigger.triggerType === 'RESET_100') {
+    targetCandle = 'ROSA';
+    targetMultiplier = '10.00x a 25.00x+';
+    const intPart = Math.floor(multiplier);
+    const decPart = Math.round((multiplier - intPart) * 100);
+    const d1 = Math.floor(intPart / 10);
+    const d2 = intPart % 10;
+    const c1 = Math.floor(decPart / 10);
+    const c2 = decPart % 10;
+    const rawDiff = Math.abs(d2 - d1) + Math.abs(c2 - c1);
+    const baseMin = rawDiff > 0 ? (rawDiff % 4 || 2) : 2;
+    minutesToAdd = Math.max(1, baseMin + calibrationOffsetMinutes);
+    formulaDisplay = trigger.isTrigger 
+      ? trigger.title 
+      : `Subtração Decimal: (${d2}-${d1}) + (${c2}-${c1}) = +${minutesToAdd} min (Calibrado 82b)`;
+  } else if (trigger.triggerType === 'TRIGGER_5X' || trigger.triggerType === 'SPECIAL_137') {
+    targetCandle = 'ROSA';
+    targetMultiplier = '5.00x a 15.00x+';
+    minutesToAdd = Math.max(1, 3 + calibrationOffsetMinutes);
+    formulaDisplay = trigger.title;
+  } else {
+    targetCandle = 'ROXA';
+    targetMultiplier = '2.00x a 4.50x';
+    const decStr = multiplier.toFixed(2).split('.')[1] || '30';
+    const firstDec = parseInt(decStr[0], 10) || 3;
+    const baseMin = firstDec > 0 ? (firstDec % 4 || 2) : 2;
+    minutesToAdd = Math.max(1, baseMin + calibrationOffsetMinutes);
+    formulaDisplay = `1º Dígito pós ponto [${firstDec}] com calibração 82b (-2m) => +${minutesToAdd} min`;
+  }
+
+  const targetDate = new Date(baseTime.getTime() + minutesToAdd * 60 * 1000);
+  const targetSeconds = baseTime.getSeconds();
+  targetDate.setSeconds(targetSeconds, 0);
+
+  return {
+    multiplierEntered: multiplier,
+    targetCandle,
+    targetMultiplier,
+    targetTimeFormatted: formatTime(targetDate),
+    targetMinute: targetDate.getMinutes(),
+    targetSeconds,
+    formulaDisplay,
+    triggerTitle: trigger.isTrigger ? trigger.title : undefined,
+    protectionAdvice: 'Saída Proteção no 1.49x | 2ª mão no alvo',
   };
 }

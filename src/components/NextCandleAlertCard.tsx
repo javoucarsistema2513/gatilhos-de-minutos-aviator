@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { RadarSignal, Candle, StudyMethod } from '../types/aviator';
+import React, { useState, useMemo } from 'react';
+import { RadarSignal, Candle, StudyMethod, LiveCandlePreview } from '../types/aviator';
 import { 
   Sparkles, 
   Zap, 
@@ -11,23 +11,26 @@ import {
   RefreshCw, 
   Timer,
   ShieldAlert,
-  Sliders,
   Calculator,
   Plus,
   BookOpen,
-  AlertTriangle,
   Compass,
   TrendingUp,
-  Award
+  Award,
+  ArrowRight,
+  SlidersHorizontal
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
+import { calculateLivePreview } from '../utils/aviatorEngine';
 
 interface NextCandleAlertCardProps {
   signal: RadarSignal;
   latestCandle: Candle | null;
   currentTimeStr: string;
   selectedMethod: StudyMethod;
+  calibrationOffset: number;
   onSelectMethod: (method: StudyMethod) => void;
+  onSelectCalibrationOffset: (offset: number) => void;
   onAutoRecalibrate: () => void;
   onRegisterResult: (isWin: boolean) => void;
   onAddCandle: (multiplier: number) => void;
@@ -39,7 +42,9 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
   latestCandle,
   currentTimeStr,
   selectedMethod,
+  calibrationOffset,
   onSelectMethod,
+  onSelectCalibrationOffset,
   onAutoRecalibrate,
   onRegisterResult,
   onAddCandle,
@@ -48,6 +53,15 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
   const [quickInput, setQuickInput] = useState('');
   const isSuperPink = signal.candleType === 'SUPER_ROSA';
   const isPink = signal.candleType === 'ROSA' || isSuperPink;
+
+  // Real-time calculation preview as the user types
+  const livePreview: LiveCandlePreview | null = useMemo(() => {
+    const val = parseFloat(quickInput.replace(',', '.'));
+    if (!isNaN(val) && val >= 1.0) {
+      return calculateLivePreview(val, new Date(), calibrationOffset);
+    }
+    return null;
+  }, [quickInput, calibrationOffset]);
 
   // Live countdown formatting
   const mins = Math.floor(signal.secondsRemaining / 60);
@@ -63,8 +77,11 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
     }
   };
 
+  const handleSelectPreset = (val: number) => {
+    setQuickInput(val.toFixed(2));
+  };
+
   const study = signal.studyCalculation;
-  const dec = signal.decimalAnalysis;
   const trigger = study.triggerInfo;
   const finalDigit = study.finalDigitInfo;
   const rule13 = study.rule13Active;
@@ -204,84 +221,132 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
         </div>
       </div>
 
-      {/* Selector: Métodos de Estudo dos Módulos */}
-      <div className="bg-[#120722] border-b border-rose-950/80 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-slate-400 text-xs font-semibold shrink-0">
-          <Compass className="w-3.5 h-3.5 text-rose-400" />
-          <span>Método do Estudo:</span>
+      {/* Selector: Métodos de Estudo dos Módulos & Calibração de Tempo 82b */}
+      <div className="bg-[#120722] border-b border-rose-950/80 px-4 py-2.5 flex flex-col gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs font-semibold shrink-0">
+            <Compass className="w-3.5 h-3.5 text-rose-400" />
+            <span>Método do Estudo:</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <button
+              onClick={() => onSelectMethod('AUTO_BEST')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
+                selectedMethod === 'AUTO_BEST'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-900/60 ring-1 ring-rose-400'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              🎯 Auto: Melhor Padrão
+            </button>
+
+            <button
+              onClick={() => onSelectMethod('SUBTRACAO_DECIMAIS')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
+                selectedMethod === 'SUBTRACAO_DECIMAIS'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/60 ring-1 ring-purple-400'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+              title="Módulo 5 pág 3 & Módulo 3 pág 7: Subtração da vela e decimais"
+            >
+              📐 Subtração Decimais
+            </button>
+
+            <button
+              onClick={() => onSelectMethod('DIGITO_APOS_PONTO')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
+                selectedMethod === 'DIGITO_APOS_PONTO'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/60 ring-1 ring-indigo-400'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+              title="Módulo 5 pág 4 & pág 33: 1º dígito após o ponto"
+            >
+              🔢 1º Dígito Pós Ponto
+            </button>
+
+            <button
+              onClick={() => onSelectMethod('MINUTO_MAIS_DECIMAL')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
+                selectedMethod === 'MINUTO_MAIS_DECIMAL'
+                  ? 'bg-teal-600 text-white shadow-md shadow-teal-900/60 ring-1 ring-teal-400'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+              title="Módulo 4 pág 44: Minuto + Decimal da vela"
+            >
+              ⏰ Minuto + Decimal
+            </button>
+
+            <button
+              onClick={() => onSelectMethod('VELAS_ESPECIAIS')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
+                selectedMethod === 'VELAS_ESPECIAIS'
+                  ? 'bg-pink-600 text-white shadow-md shadow-pink-900/60 ring-1 ring-pink-400'
+                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+              title="Módulo 4: Velas especiais 1.00x, 1.37x, 1.88x, 1.99x"
+            >
+              ✨ Velas Especiais
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          <button
-            onClick={() => onSelectMethod('AUTO_BEST')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
-              selectedMethod === 'AUTO_BEST'
-                ? 'bg-rose-600 text-white shadow-md shadow-rose-900/60 ring-1 ring-rose-400'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            🎯 Auto: Melhor Padrão
-          </button>
+        {/* Calibração de Tempo 82b (Corrige os 2 minutos de atraso) */}
+        <div className="flex items-center justify-between pt-1.5 border-t border-purple-950/60 text-[11px]">
+          <span className="text-slate-400 flex items-center gap-1">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-rose-400" />
+            <span>Calibração 82b (Tempo Real):</span>
+          </span>
 
-          <button
-            onClick={() => onSelectMethod('SUBTRACAO_DECIMAIS')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
-              selectedMethod === 'SUBTRACAO_DECIMAIS'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-900/60 ring-1 ring-purple-400'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-            title="Módulo 5 pág 3 & Módulo 3 pág 7: Subtração da vela e decimais"
-          >
-            📐 Subtração Decimais
-          </button>
+          <div className="flex items-center gap-1 font-mono">
+            <button
+              onClick={() => onSelectCalibrationOffset(-3)}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
+                calibrationOffset === -3
+                  ? 'bg-rose-600 text-white shadow'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+              title="Antecipar 3 minutos"
+            >
+              -3 min
+            </button>
 
-          <button
-            onClick={() => onSelectMethod('DIGITO_APOS_PONTO')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
-              selectedMethod === 'DIGITO_APOS_PONTO'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/60 ring-1 ring-indigo-400'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-            title="Módulo 5 pág 4 & pág 33: 1º dígito após o ponto"
-          >
-            🔢 1º Dígito Pós Ponto
-          </button>
+            <button
+              onClick={() => onSelectCalibrationOffset(-2)}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
+                calibrationOffset === -2
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+              title="Calibração recomendada para 82b.game (Antecipar 2 minutos)"
+            >
+              -2 min (Recomendado 82b)
+            </button>
 
-          <button
-            onClick={() => onSelectMethod('MINUTO_MAIS_DECIMAL')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
-              selectedMethod === 'MINUTO_MAIS_DECIMAL'
-                ? 'bg-teal-600 text-white shadow-md shadow-teal-900/60 ring-1 ring-teal-400'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-            title="Módulo 4 pág 44: Minuto + Decimal da vela"
-          >
-            ⏰ Minuto + Decimal
-          </button>
+            <button
+              onClick={() => onSelectCalibrationOffset(-1)}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
+                calibrationOffset === -1
+                  ? 'bg-purple-600 text-white shadow'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+              title="Antecipar 1 minuto"
+            >
+              -1 min
+            </button>
 
-          <button
-            onClick={() => onSelectMethod('VELAS_ESPECIAIS')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
-              selectedMethod === 'VELAS_ESPECIAIS'
-                ? 'bg-pink-600 text-white shadow-md shadow-pink-900/60 ring-1 ring-pink-400'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-            title="Módulo 4: Velas especiais 1.00x, 1.37x, 1.88x, 1.99x"
-          >
-            ✨ Velas Especiais
-          </button>
-
-          <button
-            onClick={() => onSelectMethod('CICLO_MINUTOS')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
-              selectedMethod === 'CICLO_MINUTOS'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/60 ring-1 ring-amber-400'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-            title="Módulo 4: Ciclos fixos (+3m, +10m, +20m, +30m)"
-          >
-            ⏳ Ciclos Fixos
-          </button>
+            <button
+              onClick={() => onSelectCalibrationOffset(0)}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
+                calibrationOffset === 0
+                  ? 'bg-slate-700 text-white'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+              title="Sem calibração (0 min)"
+            >
+              0 min
+            </button>
+          </div>
         </div>
       </div>
 
@@ -439,7 +504,6 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
         {/* Special Triggers & Dica de Ouro 2 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           
-          {/* Box 1: Gatilhos / Velas Especiais */}
           <div className={`p-2.5 rounded-lg border ${
             trigger?.isTrigger 
               ? 'bg-rose-950/40 border-rose-500/60 text-rose-200' 
@@ -452,12 +516,11 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
               {trigger?.isTrigger ? (
                 <strong className="text-rose-300">{trigger.title}</strong>
               ) : (
-                <span>Nenhum gatilho de reset ativo no momento. Operando no fluxo da soma decimal.</span>
+                <span>Nenhum gatilho de reset ativo no momento. Operando no fluxo calibrado da 82b.</span>
               )}
             </p>
           </div>
 
-          {/* Box 2: Dica de Ouro 2 - Finais de Vela */}
           <div className={`p-2.5 rounded-lg border ${
             finalDigit?.type === 'RED_ALERT_7'
               ? 'bg-red-950/60 border-red-500 text-red-200'
@@ -498,29 +561,130 @@ export const NextCandleAlertCard: React.FC<NextCandleAlertCardProps> = ({
 
       </div>
 
-      {/* Sincronização Direta da Vela da 82b */}
-      <div className="mx-4 sm:mx-6 mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-        <div className="flex items-center gap-1.5 text-xs text-slate-300">
-          <span className="font-bold text-white text-[11px]">Sincronizar Vela da 82b:</span>
-          <span className="text-slate-400 text-[10px]">(digite o valor que acabou de sair)</span>
+      {/* NOVO: Sincronização Direta da Vela da 82b COM PRÉVIA INSTANTÂNEA EM TEMPO REAL! */}
+      <div className="mx-4 sm:mx-6 mb-4 p-4 rounded-xl bg-[#0f0722] border border-purple-500/60 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-purple-900/60">
+          <div>
+            <span className="font-bold text-white text-xs block">
+              Sincronizar Vela da 82b (Cálculo Instantâneo em Tempo Real):
+            </span>
+            <span className="text-slate-400 text-[11px]">
+              Digite o valor da vela que acabou de sair para ver na hora o alvo e o horário exato!
+            </span>
+          </div>
+
+          {/* Quick presets from studied candles */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+            <button
+              onClick={() => handleSelectPreset(1.00)}
+              className="px-2 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900 border border-amber-600/40 text-[10px] font-bold text-amber-300 cursor-pointer"
+            >
+              1.00x Reset
+            </button>
+            <button
+              onClick={() => handleSelectPreset(1.37)}
+              className="px-2 py-0.5 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-500/50 text-[10px] font-bold text-pink-300 cursor-pointer"
+            >
+              1.37x Especial
+            </button>
+            <button
+              onClick={() => handleSelectPreset(1.88)}
+              className="px-2 py-0.5 rounded bg-purple-950/60 hover:bg-purple-900 border border-purple-600/40 text-[10px] font-bold text-purple-300 cursor-pointer"
+            >
+              1.88x Especial
+            </button>
+            <button
+              onClick={() => handleSelectPreset(12.50)}
+              className="px-2 py-0.5 rounded bg-pink-950/60 hover:bg-pink-900 border border-pink-500/50 text-[10px] font-bold text-pink-300 cursor-pointer"
+            >
+              12.50x Rosa
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleQuickAdd} className="flex items-center gap-1.5 w-full sm:w-auto">
+        <form onSubmit={handleQuickAdd} className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="Ex: 37.89"
+            placeholder="Ex: 1.37 ou 2.45"
             value={quickInput}
             onChange={(e) => setQuickInput(e.target.value)}
-            className="w-24 px-2 py-1 rounded bg-[#100720] border border-purple-500/60 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+            className="flex-1 px-3 py-2 rounded-xl bg-[#160a2c] border border-purple-500 text-sm text-white placeholder-slate-500 focus:outline-none font-mono focus:ring-2 focus:ring-purple-400"
+            autoFocus
           />
           <button
             type="submit"
-            className="px-3 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shrink-0"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-md shrink-0"
           >
-            <Plus className="w-3 h-3" />
-            <span>Calcular Estudo</span>
+            <Plus className="w-4 h-4" />
+            <span>Sincronizar e Confirmar</span>
           </button>
         </form>
+
+        {/* PRÉVIA INSTANTÂNEA AO DIGITAR (Calculada na hora!) */}
+        {livePreview && (
+          <div className="p-3.5 rounded-xl bg-gradient-to-r from-[#1b0a33] to-[#120524] border border-emerald-500/50 shadow-lg animate-in fade-in zoom-in-95 duration-150 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span>PRÉVIA INSTANTÂNEA DA VELA DIGITADA ({livePreview.multiplierEntered.toFixed(2)}x):</span>
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">
+                Calibração 82b: {calibrationOffset} min aplicada
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              
+              {/* Box 1: Vela Alvo */}
+              <div className="p-2.5 rounded-lg bg-[#0e051c] border border-purple-900/60 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-mono block">Vela Alvo Prevista:</span>
+                  <span className={`text-base font-black font-mono ${
+                    livePreview.targetCandle === 'SUPER_ROSA'
+                      ? 'text-amber-300'
+                      : livePreview.targetCandle === 'ROSA'
+                      ? 'text-pink-400'
+                      : 'text-purple-300'
+                  }`}>
+                    {livePreview.targetCandle === 'SUPER_ROSA' ? 'SUPER ROSA' : livePreview.targetCandle === 'ROSA' ? 'VELA ROSA' : 'VELA ROXA'}
+                  </span>
+                </div>
+                <span className="text-xs font-mono font-bold text-white bg-slate-800 px-2 py-0.5 rounded">
+                  {livePreview.targetMultiplier}
+                </span>
+              </div>
+
+              {/* Box 2: Horário Exato da Entrada */}
+              <div className="p-2.5 rounded-lg bg-[#0e051c] border border-purple-900/60 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-mono block">Horário Exato de Entrada:</span>
+                  <span className="text-lg font-black font-mono text-emerald-400">
+                    {livePreview.targetTimeFormatted}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 font-mono block">Minuto Alvo:</span>
+                  <span className="text-xs font-mono font-bold text-rose-300">
+                    :{String(livePreview.targetMinute).padStart(2, '0')}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+
+            <div className="pt-2 border-t border-purple-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-300">
+              <span className="font-mono text-rose-300">• {livePreview.formulaDisplay}</span>
+              <button
+                onClick={handleQuickAdd}
+                className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow"
+              >
+                <span>Aplicar esta Entrada</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Regra de Ouro da Entrada & Proteção Gale */}

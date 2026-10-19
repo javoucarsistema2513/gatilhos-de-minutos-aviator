@@ -109,3 +109,15 @@ export interface StatsData {
   lastPinkTime: string;
   averagePinkIntervalMinutes: number;
 }
+
+export interface LiveCandlePreview {
+  multiplierEntered: number;
+  targetCandle: CandlePrediction;
+  targetMultiplier: string;
+  targetTimeFormatted: string; // HH:mm:ss
+  targetMinute: number;
+  targetSeconds: number;
+  formulaDisplay: string;
+  triggerTitle?: string;
+  protectionAdvice: string;
+}

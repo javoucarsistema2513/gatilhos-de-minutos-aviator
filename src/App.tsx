@@ -30,8 +30,11 @@ export default function App() {
   // Selected study method (defaults to AUTO_BEST)
   const [selectedMethod, setSelectedMethod] = useState<StudyMethod>('AUTO_BEST');
 
+  // 82b calibration offset (-2 minutes by default to eliminate delay)
+  const [calibrationOffset, setCalibrationOffset] = useState<number>(-2);
+
   // 82b Pattern Radar Signal (Next Candle to enter)
-  const [signal, setSignal] = useState<RadarSignal>(() => calculateNextSignal(candles, 'AUTO_BEST'));
+  const [signal, setSignal] = useState<RadarSignal>(() => calculateNextSignal(candles, 'AUTO_BEST', -2));
   
   // Audio state
   const [isMuted, setIsMuted] = useState(false);
@@ -94,7 +97,7 @@ export default function App() {
 
         // When minute and gale have concluded, automatically project next paying window
         if (updated.phase === 'STANDBY') {
-          return calculateNextSignal(candles, selectedMethod);
+          return calculateNextSignal(candles, selectedMethod, calibrationOffset);
         }
 
         return updated;
@@ -115,7 +118,7 @@ export default function App() {
       unsubscribeWorker();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [candles, selectedMethod]);
+  }, [candles, selectedMethod, calibrationOffset]);
 
   // 2. User adds/syncs a candle that just appeared on 82b.game
   const handleAddCandleFromUser = useCallback((multiplier: number) => {
@@ -178,13 +181,13 @@ export default function App() {
       }));
 
       setTimeout(() => {
-        setSignal(calculateNextSignal([...candles, newCandle], selectedMethod));
+        setSignal(calculateNextSignal([...candles, newCandle], selectedMethod, calibrationOffset));
       }, 7000);
     } else {
       // Re-calibrate signal based on the freshly added 82b candle
-      setSignal(calculateNextSignal([...candles, newCandle], selectedMethod));
+      setSignal(calculateNextSignal([...candles, newCandle], selectedMethod, calibrationOffset));
     }
-  }, [candles, signal, selectedMethod]);
+  }, [candles, signal, selectedMethod, calibrationOffset]);
 
   // 3. User registers Green or Recalculate
   const handleRegisterResult = useCallback((isWin: boolean) => {
@@ -200,26 +203,33 @@ export default function App() {
         phase: 'WIN',
       }));
       setTimeout(() => {
-        setSignal(calculateNextSignal(candles, selectedMethod));
+        setSignal(calculateNextSignal(candles, selectedMethod, calibrationOffset));
       }, 7000);
     } else {
       soundFx.playClick();
-      setSignal(calculateNextSignal(candles, selectedMethod));
+      setSignal(calculateNextSignal(candles, selectedMethod, calibrationOffset));
     }
-  }, [candles, signal, selectedMethod]);
+  }, [candles, signal, selectedMethod, calibrationOffset]);
 
   // 4. Select study method
   const handleSelectMethod = useCallback((method: StudyMethod) => {
     setSelectedMethod(method);
     soundFx.playClick();
-    setSignal(calculateNextSignal(candles, method));
-  }, [candles]);
+    setSignal(calculateNextSignal(candles, method, calibrationOffset));
+  }, [candles, calibrationOffset]);
 
-  // 5. Automatic Recalibration
+  // 5. Select 82b calibration offset (-2m, -3m, etc.)
+  const handleSelectCalibrationOffset = useCallback((offset: number) => {
+    setCalibrationOffset(offset);
+    soundFx.playClick();
+    setSignal(calculateNextSignal(candles, selectedMethod, offset));
+  }, [candles, selectedMethod]);
+
+  // 6. Automatic Recalibration
   const handleAutoRecalibrate = useCallback(() => {
     soundFx.playRadarSweep();
-    setSignal(calculateNextSignal(candles, selectedMethod));
-  }, [candles, selectedMethod]);
+    setSignal(calculateNextSignal(candles, selectedMethod, calibrationOffset));
+  }, [candles, selectedMethod, calibrationOffset]);
 
   // Toggle Mute
   const handleToggleMute = () => {
@@ -271,13 +281,15 @@ export default function App() {
       {/* Main Single-Focused Centerpiece */}
       <main className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-4 py-5 flex flex-col justify-center space-y-4">
         
-        {/* THE HERO: Next Candle Alert Card */}
+        {/* THE HERO: Next Candle Alert Card with Live Typing Preview & 82b Calibration */}
         <NextCandleAlertCard
           signal={signal}
           latestCandle={candles[candles.length - 1] || null}
           currentTimeStr={currentTimeStr}
           selectedMethod={selectedMethod}
+          calibrationOffset={calibrationOffset}
           onSelectMethod={handleSelectMethod}
+          onSelectCalibrationOffset={handleSelectCalibrationOffset}
           onAutoRecalibrate={handleAutoRecalibrate}
           onRegisterResult={handleRegisterResult}
           onAddCandle={handleAddCandleFromUser}
